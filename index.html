@@ -2,55 +2,35 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud System</title>
+    <title>SKY Commerce Inventory - Cloud (Daily Reset)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; }
-        
         #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
-        
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
         .btn-backup { background: #636e72; color: white; padding: 8px 12px; font-size: 12px; border-radius: 6px; border:none; cursor:pointer; }
-        .btn-backup:hover { background: #2d3436; }
-
         .main-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
-        
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .btn-excel-dl { background: #2ecc71; color: white; width: 100%; padding: 12px; margin-top: 10px; font-size: 14px; }
-        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; }
         td { font-size: 14px; }
-        
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        
-        /* 매칭 설정 구역 정렬 개선 */
         .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
-        .chk-item { 
-            padding: 12px 15px; 
-            border-bottom: 1px solid #eee; 
-            display: flex; 
-            justify-content: space-between; /* 텍스트 좌측, 체크박스 우측 */
-            align-items: center; 
-            font-size: 14px; 
-            cursor: pointer; 
-            transition: 0.2s;
-        }
+        .chk-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; transition: 0.2s; }
         .chk-item:hover { background: #f1f1f1; }
         .chk-item span { flex: 1; margin-right: 10px; word-break: break-all; }
         .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0; }
-        
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
-        
         .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
         #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:650px; }
@@ -62,9 +42,10 @@
 
 <div class="container">
     <div class="backup-group">
-        <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침(동기화)</button>
-        <button class="btn-backup" onclick="exportData()">💾 로컬 백업 저장</button>
-        <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 불러오기(복구)</button>
+        <div style="margin-right:auto; color:var(--secondary); font-weight:bold; font-size:14px;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
+        <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침</button>
+        <button class="btn-backup" onclick="exportData()">💾 로컬 백업</button>
+        <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 복구</button>
         <input type="file" id="importFile" style="display:none" onchange="importData(event)">
     </div>
 
@@ -74,12 +55,12 @@
                 <h3>4. 실시간 재고 및 매출 현황</h3>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초</th><th>판매</th><th>재고</th><th>매출액</th><th>관리</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>당일판매</th><th>현재재고</th><th>당일매출</th><th>관리</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
                 <div class="summary">
-                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">누적 매출 합계:</span><br>
+                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">당일 매출 합계:</span><br>
                     <span id="totalSales">0</span>원
                 </div>
                 <button class="btn btn-excel-dl" onclick="downloadCurrentStatus()">📊 현재 현황 엑셀 다운로드</button>
@@ -113,7 +94,7 @@
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
                 <label>엑셀 상품명 그대로 복사</label>
-                <input type="text" id="exName" placeholder="예: [특가] 레이니 네오 글래스">
+                <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
                 <label>연결할 내부 품목 선택</label>
                 <div id="itemChecks" class="check-area"></div>
                 <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 규칙 저장</button>
@@ -121,34 +102,28 @@
             </div>
 
             <div class="card">
-                <h3>5. 날짜별 판매 기록</h3>
+                <h3>5. 전체 판매 히스토리</h3>
                 <div id="historyContainer" class="history-list"></div>
             </div>
         </div>
     </div>
 </div>
 
-<div id="modalOverlay">
-    <div class="modal-content">
-        <h3>매칭 규칙 내역</h3>
-        <span style="float:right; cursor:pointer;" onclick="closeMapModal()">[닫기]</span>
-        <table>
-            <thead><tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr></thead>
-            <tbody id="modalTableBody"></tbody>
-        </table>
-    </div>
-</div>
+<div id="modalOverlay"><div class="modal-content"><h3>매칭 규칙 내역</h3><span style="float:right; cursor:pointer;" onclick="closeMapModal()">[닫기]</span><table><thead><tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr></thead><tbody id="modalTableBody"></tbody></table></div></div>
 
 <script>
-    // ★★★ 중요: 여기에 본인의 구글 웹 앱 URL을 붙여넣으세요 ★★★
+    // ★★★ 중요: 본인의 구글 웹 앱 URL을 붙여넣으세요 ★★★
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
 
     let db_master = [];
     let db_map = [];
     let db_history = [];
+    let lastSyncDate = ""; // 마지막 저장 날짜 추적
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
+    function getToday() { return new Date().toISOString().slice(0, 10); }
 
+    // 클라우드 데이터 로드 및 날짜 체크
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -157,11 +132,26 @@
             db_master = data.master || [];
             db_map = data.map || [];
             db_history = data.history || [];
+            
+            // 마지막 히스토리 날짜 혹은 마스터 기준으로 날짜 체크
+            const today = getToday();
+            // 히스토리의 가장 최근 날짜를 찾음
+            const lastDateInHistory = db_history.length > 0 ? db_history.sort((a,b) => b.date.localeCompare(a.date))[0].date : today;
+
+            // 만약 마지막 기록 날짜가 오늘보다 이전이라면 자정 초기화 로직 실행
+            if (lastDateInHistory < today) {
+                console.log("날짜 변경 감지: 데이터 이월 작업을 시작합니다.");
+                db_master.forEach(item => {
+                    item.initial = item.initial - item.sold; // 남은 재고가 새로운 기초재고가 됨
+                    item.sold = 0; // 당일 판매량 초기화
+                });
+                // 변경된 데이터를 클라우드에 즉시 저장
+                await saveToCloud();
+            }
+            
+            document.getElementById('currentDateDisp').innerText = today;
             render();
-        } catch (e) { 
-            console.error(e);
-            alert("데이터 로딩 실패! URL 혹은 권한 설정을 확인하세요."); 
-        }
+        } catch (e) { alert("데이터 로딩 실패!"); }
         toggleLoading(false);
     }
 
@@ -177,25 +167,7 @@
         toggleLoading(false);
     }
 
-    function importData(e) {
-        const reader = new FileReader();
-        reader.onload = async (event) => {
-            try {
-                const data = JSON.parse(event.target.result);
-                if (confirm("백업 파일로 클라우드 데이터를 덮어쓰시겠습니까?")) {
-                    db_master = data.master || [];
-                    db_map = data.map || [];
-                    db_history = data.history || [];
-                    await saveToCloud();
-                    alert("성공적으로 복구되었습니다.");
-                }
-            } catch (err) { alert("올바른 백업 파일이 아닙니다."); }
-        };
-        reader.readAsText(e.target.files[0]);
-    }
-
-    function getToday() { return new Date().toISOString().slice(0, 10); }
-
+    // 이하 동일한 비즈니스 로직
     function addHistory(itemName, qty) {
         const date = getToday();
         const existing = db_history.find(h => h.date === date && h.name === itemName);
@@ -205,12 +177,7 @@
     async function addItem() {
         const name = document.getElementById('mName').value.trim();
         if(!name) return;
-        db_master.push({ 
-            name, 
-            price: parseInt(document.getElementById('mPrice').value)||0, 
-            initial: parseInt(document.getElementById('mQty').value)||0, 
-            sold: 0 
-        });
+        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
         await saveToCloud();
         document.getElementById('mName').value = "";
     }
@@ -231,20 +198,18 @@
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-            let count = 0;
             rows.forEach(row => {
-                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'] || row['컴퓨존 제품명'];
-                const qty = parseInt(row['수량'] || row['구매수량'] || row['주문수량']) || 1;
+                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['컴퓨존 제품명'];
+                const qty = parseInt(row['수량'] || row['구매수량'] || row['구매수(수량)']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
                         const item = db_master.find(i => i.name === tName); 
-                        if(item) { item.sold += qty; addHistory(tName, qty); count++; } 
+                        if(item) { item.sold += qty; addHistory(tName, qty); } 
                     });
                 }
             });
             await saveToCloud();
-            alert(count + "건 반영 완료");
         };
         reader.readAsArrayBuffer(file);
     }
@@ -252,70 +217,57 @@
     async function addMap() {
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-        if(!exName || targets.length === 0) return alert("매칭 정보를 입력하세요.");
+        if(!exName || targets.length === 0) return;
         db_map.push({ exName, targets });
         await saveToCloud();
         document.getElementById('exName').value = "";
     }
 
-    function downloadCurrentStatus() {
-        const data = db_master.map(item => ({ 
-            "품목명": item.name, "단가": item.price, "기초재고": item.initial, 
-            "누적판매": item.sold, "현재재고": item.initial - item.sold, "누적매출": item.sold * item.price 
-        }));
-        const ws = XLSX.utils.json_to_sheet(data);
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "현황");
-        XLSX.writeFile(wb, `SKY_재고현황_${getToday()}.xlsx`);
-    }
-
     async function stockIn(idx) { const v = prompt("입고 수량:"); if(v) { db_master[idx].initial += parseInt(v); await saveToCloud(); } }
-    async function editItem(idx) { const v = prompt("실재고로 수정 (누적판매는 0으로 초기화됨):"); if(v!==null){ db_master[idx].initial=parseInt(v); db_master[idx].sold=0; await saveToCloud(); } }
-    async function delItem(idx) { if(confirm("품목을 삭제하시겠습니까?")) { db_master.splice(idx,1); await saveToCloud(); } }
+    async function editItem(idx) { const v = prompt("현재 실재고 설정(판매량 0으로 리셋):"); if(v!==null){ db_master[idx].initial=parseInt(v); db_master[idx].sold=0; await saveToCloud(); } }
+    async function delItem(idx) { if(confirm("삭제하시겠습니까?")) { db_master.splice(idx,1); await saveToCloud(); } }
     async function delMap(idx) { db_map.splice(idx, 1); await saveToCloud(); openMapModal(); }
     function openMapModal() { const tb = document.getElementById('modalTableBody'); tb.innerHTML = ""; db_map.forEach((m, i) => { tb.innerHTML += `<tr><td>${m.exName}</td><td>${m.targets.join(', ')}</td><td><button onclick="delMap(${i})">삭제</button></td></tr>`; }); document.getElementById('modalOverlay').style.display = 'block'; }
     function closeMapModal() { document.getElementById('modalOverlay').style.display = 'none'; }
-    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Cloud_Backup_${getToday()}.json`; a.click(); }
+    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Backup_${getToday()}.json`; a.click(); }
+    async function importData(e) {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const d = JSON.parse(ev.target.result);
+            if(confirm("데이터를 덮어쓰시겠습니까?")) { db_master=d.master; db_map=d.map; db_history=d.history; await saveToCloud(); }
+        };
+        reader.readAsText(e.target.files[0]);
+    }
 
     function render() {
         const table = document.getElementById('mainTable');
         const checks = document.getElementById('itemChecks');
         const directSelect = document.getElementById('directItemSelect');
         const historyList = document.getElementById('historyContainer');
-        let totalSales = 0;
-
-        table.innerHTML = "";
-        directSelect.innerHTML = `<option value="">-- 품목 직접 선택 --</option>`;
+        let dailyTotal = 0; table.innerHTML = "";
+        directSelect.innerHTML = `<option value="">-- 품목 선택 --</option>`;
+        
         db_master.forEach((item, idx) => {
             const current = item.initial - item.sold;
             const sales = item.sold * item.price;
-            totalSales += sales;
+            dailyTotal += sales;
             table.innerHTML += `<tr>
                 <td style="text-align:left"><strong>${item.name}</strong></td>
                 <td>${item.price.toLocaleString()}</td>
                 <td>${item.initial}</td>
-                <td>${item.sold}</td>
-                <td style="font-weight:bold; color:${current < 10 ? '#e74c3c':'#2c3e50'}">${current}</td>
+                <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
+                <td style="font-weight:bold;">${current}</td>
                 <td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td>
-                <td>
-                    <button class="btn" style="background:#2980b9; color:white; padding:4px 8px; font-size:11px;" onclick="stockIn(${idx})">입고</button>
-                    <button class="btn" style="background:#f39c12; color:white; padding:4px 8px; font-size:11px;" onclick="editItem(${idx})">수정</button>
-                    <button class="btn" style="background:#e74c3c; color:white; padding:4px 8px; font-size:11px;" onclick="delItem(${idx})">삭제</button>
-                </td>
+                <td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td>
             </tr>`;
             directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
         });
-        document.getElementById('totalSales').innerText = totalSales.toLocaleString();
+        document.getElementById('totalSales').innerText = dailyTotal.toLocaleString();
 
-        // [정렬 개선된 체크박스 구역]
         checks.innerHTML = "";
         db_master.forEach((item, idx) => { 
             const chkId = `chk_${idx}`;
-            checks.innerHTML += `
-                <label class="chk-item" for="${chkId}">
-                    <span>${item.name}</span>
-                    <input type="checkbox" class="chk" value="${item.name}" id="${chkId}">
-                </label>`; 
+            checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
         });
 
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
@@ -325,11 +277,10 @@
             grouped[date].forEach(item => { historyHTML += `<div style="display:flex; justify-content:space-between; padding:2px 5px;"><span>${item.name}</span><b>${item.qty}개</b></div>`; });
             historyHTML += `</div>`;
         });
-        historyList.innerHTML = historyHTML || "<p style='text-align:center; color:#999;'>기록이 없습니다.</p>";
+        historyList.innerHTML = historyHTML || "기록 없음";
     }
 
     loadFromCloud();
 </script>
 </body>
 </html>
-
