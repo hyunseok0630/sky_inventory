@@ -20,7 +20,7 @@
         .btn-excel-dl { background: #2ecc71; color: white; width: 100%; padding: 12px; margin-top: 10px; font-size: 14px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
-        th { background: #f4f6f8; font-size: 13px; color: #555; }
+        th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; } /* 헤더 고정 */
         td { font-size: 14px; }
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
@@ -32,8 +32,24 @@
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
         .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
+        
+        /* --- 모달 스크롤 수정 부분 --- */
         #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
-        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:650px; }
+        .modal-content { 
+            position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); 
+            background:white; padding:25px; border-radius:12px; 
+            width:90%; max-width:800px; 
+            max-height: 80vh; /* 화면 높이의 80%까지만 확장 */
+            display: flex; flex-direction: column; 
+        }
+        .modal-body { 
+            overflow-y: auto; /* 내용이 많으면 스크롤 생성 */
+            margin-top: 15px;
+            border: 1px solid var(--border);
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        .modal-header h3 { border: none; margin: 0; padding: 0; }
+        /* --------------------------- */
     </style>
 </head>
 <body>
@@ -109,21 +125,33 @@
     </div>
 </div>
 
-<div id="modalOverlay"><div class="modal-content"><h3>매칭 규칙 내역</h3><span style="float:right; cursor:pointer;" onclick="closeMapModal()">[닫기]</span><table><thead><tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr></thead><tbody id="modalTableBody"></tbody></table></div></div>
+<div id="modalOverlay">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>매칭 규칙 내역</h3>
+            <span style="cursor:pointer; font-weight:bold; color:#e74c3c;" onclick="closeMapModal()">[닫기]</span>
+        </div>
+        <div class="modal-body">
+            <table>
+                <thead>
+                    <tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr>
+                </thead>
+                <tbody id="modalTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
 <script>
-    // ★★★ 중요: 본인의 구글 웹 앱 URL을 붙여넣으세요 ★★★
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
 
     let db_master = [];
     let db_map = [];
     let db_history = [];
-    let lastSyncDate = ""; // 마지막 저장 날짜 추적
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toISOString().slice(0, 10); }
 
-    // 클라우드 데이터 로드 및 날짜 체크
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -132,23 +160,16 @@
             db_master = data.master || [];
             db_map = data.map || [];
             db_history = data.history || [];
-            
-            // 마지막 히스토리 날짜 혹은 마스터 기준으로 날짜 체크
             const today = getToday();
-            // 히스토리의 가장 최근 날짜를 찾음
             const lastDateInHistory = db_history.length > 0 ? db_history.sort((a,b) => b.date.localeCompare(a.date))[0].date : today;
 
-            // 만약 마지막 기록 날짜가 오늘보다 이전이라면 자정 초기화 로직 실행
             if (lastDateInHistory < today) {
-                console.log("날짜 변경 감지: 데이터 이월 작업을 시작합니다.");
                 db_master.forEach(item => {
-                    item.initial = item.initial - item.sold; // 남은 재고가 새로운 기초재고가 됨
-                    item.sold = 0; // 당일 판매량 초기화
+                    item.initial = item.initial - item.sold;
+                    item.sold = 0;
                 });
-                // 변경된 데이터를 클라우드에 즉시 저장
                 await saveToCloud();
             }
-            
             document.getElementById('currentDateDisp').innerText = today;
             render();
         } catch (e) { alert("데이터 로딩 실패!"); }
@@ -167,7 +188,6 @@
         toggleLoading(false);
     }
 
-    // 이하 동일한 비즈니스 로직
     function addHistory(itemName, qty) {
         const date = getToday();
         const existing = db_history.find(h => h.date === date && h.name === itemName);
@@ -227,9 +247,19 @@
     async function editItem(idx) { const v = prompt("현재 실재고 설정(판매량 0으로 리셋):"); if(v!==null){ db_master[idx].initial=parseInt(v); db_master[idx].sold=0; await saveToCloud(); } }
     async function delItem(idx) { if(confirm("삭제하시겠습니까?")) { db_master.splice(idx,1); await saveToCloud(); } }
     async function delMap(idx) { db_map.splice(idx, 1); await saveToCloud(); openMapModal(); }
-    function openMapModal() { const tb = document.getElementById('modalTableBody'); tb.innerHTML = ""; db_map.forEach((m, i) => { tb.innerHTML += `<tr><td>${m.exName}</td><td>${m.targets.join(', ')}</td><td><button onclick="delMap(${i})">삭제</button></td></tr>`; }); document.getElementById('modalOverlay').style.display = 'block'; }
+    
+    function openMapModal() { 
+        const tb = document.getElementById('modalTableBody'); 
+        tb.innerHTML = ""; 
+        db_map.forEach((m, i) => { 
+            tb.innerHTML += `<tr><td style="text-align:left">${m.exName}</td><td>${m.targets.join(', ')}</td><td><button class="btn" style="background:#e74c3c; color:white;" onclick="delMap(${i})">삭제</button></td></tr>`; 
+        }); 
+        document.getElementById('modalOverlay').style.display = 'block'; 
+    }
+    
     function closeMapModal() { document.getElementById('modalOverlay').style.display = 'none'; }
     function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Backup_${getToday()}.json`; a.click(); }
+    
     async function importData(e) {
         const reader = new FileReader();
         reader.onload = async (ev) => {
