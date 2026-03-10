@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud (Professional UI)</title>
+    <title>SKY Commerce - Unified Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
+        :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; }
         #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
@@ -24,6 +24,7 @@
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
+        .btn-mgmt { background: var(--secondary); color: white; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
@@ -31,56 +32,22 @@
         td { font-size: 14px; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
+        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
+        
+        /* 모달 공통 스타일 */
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
+        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .modal-btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .mgmt-menu-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fa; cursor: pointer; font-weight: bold; text-align: left; transition: 0.2s; }
+        .mgmt-menu-btn:hover { background: var(--primary); color: white; border-color: var(--primary); }
 
-        /* --- 2. 플랫폼 매칭 리스트 개선 디자인 --- */
-        .check-area { 
-            height: 320px; 
-            overflow-y: auto; 
-            border: 1px solid var(--border); 
-            border-radius: 8px; 
-            background: #fff; 
-            margin-bottom: 15px;
-        }
-        .chk-item { 
-            display: flex; 
-            align-items: center; 
-            justify-content: space-between; 
-            padding: 12px 16px; 
-            border-bottom: 1px solid #f1f3f5; 
-            cursor: pointer; 
-            transition: background 0.2s;
-        }
-        .chk-item:hover { background: #f8f9fa; }
-        .chk-item:last-child { border-bottom: none; }
-        .chk-item span { 
-            font-size: 14px; 
-            color: #333; 
-            font-weight: 500;
-            line-height: 1.4;
-            flex: 1;
-            margin-right: 15px;
-            word-break: keep-all;
-        }
-        /* 체크박스 커스텀 정렬 */
-        .chk-item input[type="checkbox"] { 
-            width: 18px; 
-            height: 18px; 
-            margin: 0; 
-            cursor: pointer;
-            accent-color: var(--primary); /* 체크박스 포인트 색상 */
-        }
-        /* -------------------------------------- */
-
-        .history-list { max-height: 450px; overflow-y: auto; font-size: 13px; }
+        .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; padding: 3px 5px; border-bottom: 1px solid #f0f0f0; }
-        .source-tag { font-size: 10px; background: #ebedef; padding: 2px 5px; border-radius: 4px; color: #666; margin-right: 5px; vertical-align: middle; }
-        
-        .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
-        #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
-        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:800px; max-height: 80vh; display: flex; flex-direction: column; }
-        .modal-body { overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); }
+        .source-tag { font-size: 10px; background: #ebedef; padding: 2px 5px; border-radius: 4px; color: #666; margin-right: 5px; }
+        .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -134,11 +101,11 @@
                 <div class="split-box">
                     <div style="flex: 2;"><select id="directItemSelect"></select></div>
                     <div style="flex: 1;"><input type="number" id="directQty" value="1" min="1"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--point); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="applyDirectSale()">즉시 반영</button></div>
+                    <div style="flex: 1.5;"><button class="btn" style="background:var(--point); color:white; width:100%; height:40px;" onclick="applyDirectSale()">즉시 반영</button></div>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: flex-end;">
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">엑셀 반영</button></div>
+                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
             </div>
 
@@ -160,19 +127,34 @@
     </div>
 </div>
 
-<div id="modalOverlay">
+<div id="mgmtModal" class="modal-overlay">
     <div class="modal-content">
-        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--primary); padding-bottom:10px;">
-            <h3 style="margin:0; border:none;">매칭 규칙 내역</h3>
-            <span style="cursor:pointer; font-weight:bold; color:#e74c3c;" onclick="closeMapModal()">[닫기]</span>
+        <h3 style="width:100%; text-align:center;">품목 관리 메뉴</h3>
+        <button class="mgmt-menu-btn" onclick="openActionModal('in')">📦 입고 수량 추가</button>
+        <button class="mgmt-menu-btn" onclick="openActionModal('edit')">✏️ 재고 수량 수정</button>
+        <button class="mgmt-menu-btn" onclick="openActionModal('del')">❌ 품목 삭제</button>
+        <button class="btn" style="width:100%; margin-top:10px;" onclick="closeMgmtModal()">닫기</button>
+    </div>
+</div>
+
+<div id="actionModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="actionTitle" style="width:100%;">관리 작업</h3>
+        <label>대상 품목 선택</label>
+        <select id="actionItemSelect"></select>
+        
+        <div id="qtyInputArea">
+            <label id="qtyLabel">수량 입력</label>
+            <input type="number" id="actionQty" value="0">
         </div>
-        <div class="modal-body">
-            <table>
-                <thead>
-                    <tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr>
-                </thead>
-                <tbody id="modalTableBody"></tbody>
-            </table>
+
+        <div id="deleteConfirmMsg" style="display:none; color:var(--danger); font-weight:bold; margin-bottom:15px;">
+            정말로 이 품목을 삭제하시겠습니까?
+        </div>
+
+        <div class="modal-btn-group">
+            <button class="btn" style="background:#eee;" onclick="closeActionModal()">취소</button>
+            <button id="actionConfirmBtn" class="btn btn-main">확인</button>
         </div>
     </div>
 </div>
@@ -199,10 +181,7 @@
             const lastDateInHistory = db_history.length > 0 ? db_history.sort((a,b) => b.date.localeCompare(a.date))[0].date : today;
 
             if (lastDateInHistory < today) {
-                db_master.forEach(item => {
-                    item.initial = item.initial - item.sold;
-                    item.sold = 0;
-                });
+                db_master.forEach(item => { item.initial = item.initial - item.sold; item.sold = 0; });
                 await saveToCloud();
             }
             document.getElementById('currentDateDisp').innerText = today;
@@ -221,6 +200,73 @@
             render();
         } catch (e) { alert("저장 실패!"); }
         toggleLoading(false);
+    }
+
+    // 관리 모달 열기/닫기
+    function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
+    function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
+
+    // 입고, 수정, 삭제 상세 창 열기
+    let currentMode = '';
+    function openActionModal(mode) {
+        currentMode = mode;
+        closeMgmtModal();
+        const modal = document.getElementById('actionModal');
+        const title = document.getElementById('actionTitle');
+        const qtyArea = document.getElementById('qtyInputArea');
+        const delMsg = document.getElementById('deleteConfirmMsg');
+        const confirmBtn = document.getElementById('actionConfirmBtn');
+        const select = document.getElementById('actionItemSelect');
+        
+        // 품목 리스트 채우기
+        select.innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+        
+        // 초기화
+        qtyArea.style.display = 'block';
+        delMsg.style.display = 'none';
+        confirmBtn.style.background = 'var(--primary)';
+        document.getElementById('actionQty').value = 0;
+
+        if(mode === 'in') {
+            title.innerText = "📦 입고 수량 추가";
+            document.getElementById('qtyLabel').innerText = "추가할 입고 수량";
+            confirmBtn.innerText = "입고 처리";
+        } else if(mode === 'edit') {
+            title.innerText = "✏️ 재고 수량 수정";
+            document.getElementById('qtyLabel').innerText = "수정할 현재 실재고 수량";
+            confirmBtn.innerText = "수정 완료";
+        } else if(mode === 'del') {
+            title.innerText = "❌ 품목 삭제";
+            qtyArea.style.display = 'none';
+            delMsg.style.display = 'block';
+            confirmBtn.innerText = "삭제 확정";
+            confirmBtn.style.background = 'var(--danger)';
+        }
+        
+        confirmBtn.onclick = processMgmtAction;
+        modal.style.display = 'block';
+    }
+
+    function closeActionModal() { document.getElementById('actionModal').style.display = 'none'; }
+
+    async function processMgmtAction() {
+        const itemName = document.getElementById('actionItemSelect').value;
+        const qty = parseInt(document.getElementById('actionQty').value) || 0;
+        const idx = db_master.findIndex(i => i.name === itemName);
+        
+        if(idx === -1) return;
+
+        if(currentMode === 'in') {
+            db_master[idx].initial += qty;
+        } else if(currentMode === 'edit') {
+            db_master[idx].initial = qty;
+            db_master[idx].sold = 0; // 수정 시 판매량 리셋 로직 유지
+        } else if(currentMode === 'del') {
+            db_master.splice(idx, 1);
+        }
+        
+        await saveToCloud();
+        closeActionModal();
     }
 
     function addHistory(itemName, qty, source = "직접입력") {
@@ -249,16 +295,11 @@
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
         if(!file) return;
-
         const fileName = file.name;
         let source = "기타엑셀";
         if(fileName.includes("쿠팡")) source = "쿠팡";
-        else if(fileName.includes("네이버") || fileName.includes("스마트스토어")) source = "네이버";
+        else if(fileName.includes("네이버")) source = "네이버";
         else if(fileName.includes("컴퓨존")) source = "컴퓨존";
-        else if(fileName.includes("11번가")) source = "11번가";
-        else if(fileName.includes("지마켓") || fileName.includes("G마켓")) source = "G마켓";
-        else if(fileName.includes("옥션")) source = "옥션";
-
         const reader = new FileReader();
         reader.onload = async function(e) {
             const data = new Uint8Array(e.target.result);
@@ -266,7 +307,7 @@
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             rows.forEach(row => {
                 const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['컴퓨존 제품명'];
-                const qty = parseInt(row['수량'] || row['구매수량'] || row['구매수(수량)']) || 1;
+                const qty = parseInt(row['수량'] || row['구매수량']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
@@ -288,32 +329,6 @@
         db_map.push({ exName, targets });
         await saveToCloud();
         document.getElementById('exName').value = "";
-    }
-
-    async function stockIn(idx) { const v = prompt("입고 수량:"); if(v) { db_master[idx].initial += parseInt(v); await saveToCloud(); } }
-    async function editItem(idx) { const v = prompt("현재 실재고 설정(판매량 0으로 리셋):"); if(v!==null){ db_master[idx].initial=parseInt(v); db_master[idx].sold=0; await saveToCloud(); } }
-    async function delItem(idx) { if(confirm("삭제하시겠습니까?")) { db_master.splice(idx,1); await saveToCloud(); } }
-    async function delMap(idx) { db_map.splice(idx, 1); await saveToCloud(); openMapModal(); }
-    
-    function openMapModal() { 
-        const tb = document.getElementById('modalTableBody'); 
-        tb.innerHTML = ""; 
-        db_map.forEach((m, i) => { 
-            tb.innerHTML += `<tr><td style="text-align:left">${m.exName}</td><td>${m.targets.join(', ')}</td><td><button class="btn" style="background:#e74c3c; color:white;" onclick="delMap(${i})">삭제</button></td></tr>`; 
-        }); 
-        document.getElementById('modalOverlay').style.display = 'block'; 
-    }
-    
-    function closeMapModal() { document.getElementById('modalOverlay').style.display = 'none'; }
-    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Backup_${getToday()}.json`; a.click(); }
-    
-    async function importData(e) {
-        const reader = new FileReader();
-        reader.onload = async (ev) => {
-            const d = JSON.parse(ev.target.result);
-            if(confirm("데이터를 덮어쓰시겠습니까?")) { db_master=d.master; db_map=d.map; db_history=d.history; await saveToCloud(); }
-        };
-        reader.readAsText(e.target.files[0]);
     }
 
     function render() {
@@ -340,46 +355,41 @@
                     <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
                     <td style="font-weight:bold;">${current}</td>
                     <td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td>
-                    <td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td>
+                    <td><button class="btn btn-mgmt" onclick="openMgmtModal()">관리</button></td>
                 </tr>`;
             }
         });
         document.getElementById('totalSales').innerText = dailyTotal.toLocaleString();
 
-        // 매칭용 체크박스 및 드롭다운 (가나다순)
         checks.innerHTML = "";
         const sortedItems = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-        
         sortedItems.forEach((item) => { 
             directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
-            
             const chkId = `chk_${item.name.replace(/\s+/g, '_')}`;
-            // 개선된 리스트 아이템 레이아웃
-            checks.innerHTML += `
-                <label class="chk-item" for="${chkId}">
-                    <span>${item.name}</span>
-                    <input type="checkbox" class="chk" value="${item.name}" id="${chkId}">
-                </label>
-            `; 
+            checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
         });
 
-        // 히스토리 렌더링
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
             historyHTML += `<div class="history-day"><div class="history-date">${date}</div>`;
             grouped[date].forEach(item => { 
-                historyHTML += `
-                <div class="history-row">
-                    <span><span class="source-tag">${item.source || '일반'}</span>${item.name}</span>
-                    <b>${item.qty}개</b>
-                </div>`; 
+                historyHTML += `<div class="history-row"><span><span class="source-tag">${item.source}</span>${item.name}</span><b>${item.qty}개</b></div>`; 
             });
             historyHTML += `</div>`;
         });
         historyList.innerHTML = historyHTML || "기록 없음";
     }
 
+    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Backup_${getToday()}.json`; a.click(); }
+    async function importData(e) {
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            const d = JSON.parse(ev.target.result);
+            if(confirm("데이터를 덮어쓰시겠습니까?")) { db_master=d.master; db_map=d.map; db_history=d.history; await saveToCloud(); }
+        };
+        reader.readAsText(e.target.files[0]);
+    }
     loadFromCloud();
 </script>
 </body>
