@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud (Search Enabled)</title>
+    <title>SKY Commerce Inventory - Cloud (Source Tracking)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
@@ -16,14 +16,13 @@
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
         /* 검색창 스타일 */
-        .search-box { position: relative; margin-bottom: 15px; }
-        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); }
-        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 10px; font-size: 16px; }
+        .search-box { position: relative; margin-bottom: 0; }
+        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); height: 38px; }
+        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 8px; font-size: 16px; }
 
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
-        .btn-excel-dl { background: #2ecc71; color: white; width: 100%; padding: 12px; margin-top: 10px; font-size: 14px; }
         
         table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
@@ -34,18 +33,16 @@
         .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
         .chk-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; transition: 0.2s; }
         .chk-item:hover { background: #f1f1f1; }
-        .chk-item span { flex: 1; margin-right: 10px; word-break: break-all; }
-        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0; }
-        .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
+        .history-list { max-height: 450px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
-        .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
+        .history-row { display: flex; justify-content: space-between; padding: 3px 5px; border-bottom: 1px solid #f0f0f0; }
+        .source-tag { font-size: 10px; background: #ebedef; padding: 2px 5px; border-radius: 4px; color: #666; margin-right: 5px; vertical-align: middle; }
         
+        .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
         #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:800px; max-height: 80vh; display: flex; flex-direction: column; }
         .modal-body { overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
-        .modal-header h3 { border: none; margin: 0; padding: 0; }
     </style>
 </head>
 <body>
@@ -66,7 +63,7 @@
             <div class="card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <h3 style="margin-bottom:0; border:none;">4. 실시간 재고 및 매출 현황</h3>
-                    <div class="search-box" style="width: 250px; margin-bottom:0;">
+                    <div class="search-box" style="width: 220px;">
                         <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
                     </div>
                 </div>
@@ -77,10 +74,9 @@
                     <tbody id="mainTable"></tbody>
                 </table>
                 <div class="summary">
-                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">당일 매출 합계 (검색 포함 전체):</span><br>
+                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">당일 매출 합계:</span><br>
                     <span id="totalSales">0</span>원
                 </div>
-                <button class="btn btn-excel-dl" onclick="downloadCurrentStatus()">📊 현재 현황 엑셀 다운로드</button>
             </div>
 
             <div class="card">
@@ -106,6 +102,7 @@
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
                     <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
+                <small style="color:#777;">* 엑셀 파일명에 '쿠팡', '네이버' 등 판매처를 포함하면 자동으로 분류됩니다.</small>
             </div>
 
             <div class="card">
@@ -128,8 +125,8 @@
 
 <div id="modalOverlay">
     <div class="modal-content">
-        <div class="modal-header">
-            <h3>매칭 규칙 내역</h3>
+        <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--primary); padding-bottom:10px;">
+            <h3 style="margin:0; border:none;">매칭 규칙 내역</h3>
             <span style="cursor:pointer; font-weight:bold; color:#e74c3c;" onclick="closeMapModal()">[닫기]</span>
         </div>
         <div class="modal-body">
@@ -189,10 +186,16 @@
         toggleLoading(false);
     }
 
-    function addHistory(itemName, qty) {
+    // 수정된 히스토리 추가 함수: 판매처(source) 파라미터 추가
+    function addHistory(itemName, qty, source = "직접입력") {
         const date = getToday();
-        const existing = db_history.find(h => h.date === date && h.name === itemName);
-        if(existing) existing.qty += qty; else db_history.push({ date, name: itemName, qty });
+        // 날짜, 품목명, 판매처가 모두 같은 경우에만 누적
+        const existing = db_history.find(h => h.date === date && h.name === itemName && h.source === source);
+        if(existing) {
+            existing.qty += qty;
+        } else {
+            db_history.push({ date, name: itemName, qty, source });
+        }
     }
 
     async function addItem() {
@@ -208,12 +211,28 @@
         const qty = parseInt(document.getElementById('directQty').value) || 0;
         if(!itemName || qty <= 0) return;
         const item = db_master.find(i => i.name === itemName);
-        if(item) { item.sold += qty; addHistory(itemName, qty); await saveToCloud(); }
+        if(item) { 
+            item.sold += qty; 
+            addHistory(itemName, qty, "수기반영"); 
+            await saveToCloud(); 
+        }
     }
 
     function loadExcel() {
-        const file = document.getElementById('exFile').files[0];
+        const fileInput = document.getElementById('exFile');
+        const file = fileInput.files[0];
         if(!file) return;
+
+        // 파일명에서 판매처 추출 (예: '쿠팡_매출현황.xlsx' -> '쿠팡')
+        const fileName = file.name;
+        let source = "기타엑셀";
+        if(fileName.includes("쿠팡")) source = "쿠팡";
+        else if(fileName.includes("네이버") || fileName.includes("스마트스토어")) source = "네이버";
+        else if(fileName.includes("컴퓨존")) source = "컴퓨존";
+        else if(fileName.includes("11번가")) source = "11번가";
+        else if(fileName.includes("지마켓") || fileName.includes("G마켓")) source = "G마켓";
+        else if(fileName.includes("옥션")) source = "옥션";
+
         const reader = new FileReader();
         reader.onload = async function(e) {
             const data = new Uint8Array(e.target.result);
@@ -226,11 +245,15 @@
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
                         const item = db_master.find(i => i.name === tName); 
-                        if(item) { item.sold += qty; addHistory(tName, qty); } 
+                        if(item) { 
+                            item.sold += qty; 
+                            addHistory(tName, qty, source); // 추출한 source 전달
+                        } 
                     });
                 }
             });
             await saveToCloud();
+            fileInput.value = ""; // 파일 선택 초기화
         };
         reader.readAsArrayBuffer(file);
     }
@@ -275,7 +298,7 @@
         const checks = document.getElementById('itemChecks');
         const directSelect = document.getElementById('directItemSelect');
         const historyList = document.getElementById('historyContainer');
-        const searchTerm = document.getElementById('inventorySearch').value.toLowerCase(); // 검색어 획득
+        const searchTerm = document.getElementById('inventorySearch').value.toLowerCase();
         
         let dailyTotal = 0; 
         table.innerHTML = "";
@@ -286,7 +309,6 @@
             const sales = item.sold * item.price;
             dailyTotal += sales;
 
-            // 검색어 필터링 조건
             if (item.name.toLowerCase().includes(searchTerm)) {
                 table.innerHTML += `<tr>
                     <td style="text-align:left"><strong>${item.name}</strong></td>
@@ -308,11 +330,18 @@
             checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
         });
 
+        // 히스토리 렌더링 (판매처 태그 포함)
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
             historyHTML += `<div class="history-day"><div class="history-date">${date}</div>`;
-            grouped[date].forEach(item => { historyHTML += `<div style="display:flex; justify-content:space-between; padding:2px 5px;"><span>${item.name}</span><b>${item.qty}개</b></div>`; });
+            grouped[date].forEach(item => { 
+                historyHTML += `
+                <div class="history-row">
+                    <span><span class="source-tag">${item.source || '일반'}</span>${item.name}</span>
+                    <b>${item.qty}개</b>
+                </div>`; 
+            });
             historyHTML += `</div>`;
         });
         historyList.innerHTML = historyHTML || "기록 없음";
