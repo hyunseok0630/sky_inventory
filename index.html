@@ -233,7 +233,7 @@
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             let count = 0;
             rows.forEach(row => {
-                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'];
+                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'] || row['컴퓨존 제품명'];
                 const qty = parseInt(row['수량'] || row['구매수량'] || row['주문수량']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
@@ -332,3 +332,4 @@
 </script>
 </body>
 </html>
+
