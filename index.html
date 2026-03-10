@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud</title>
+    <title>SKY Commerce Inventory - Cloud System</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
@@ -10,27 +10,34 @@
         .container { max-width: 1400px; margin: 0 auto; }
         
         /* 로딩 애니메이션 */
-        #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); }
+        #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
         
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
         .btn-backup { background: #636e72; color: white; padding: 8px 12px; font-size: 12px; border-radius: 6px; border:none; cursor:pointer; }
+        .btn-backup:hover { background: #2d3436; }
+
         .main-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
-        h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; }
+        h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
+        
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .btn-excel-dl { background: #2ecc71; color: white; width: 100%; padding: 12px; margin-top: 10px; font-size: 14px; }
+        
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; }
         td { font-size: 14px; }
+        
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        .check-area { height: 300px; overflow-y: auto; border: 1px solid #ddd; padding: 5px 10px; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
+        .check-area { height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 5px 10px; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
         .chk-item { padding: 10px 5px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; }
+        
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
+        
         .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
         #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:650px; }
@@ -44,6 +51,8 @@
     <div class="backup-group">
         <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침(동기화)</button>
         <button class="btn-backup" onclick="exportData()">💾 로컬 백업 저장</button>
+        <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 불러오기(복구)</button>
+        <input type="file" id="importFile" style="display:none" onchange="importData(event)">
     </div>
 
     <div class="main-layout">
@@ -66,7 +75,7 @@
             <div class="card">
                 <h3>1. 신규 품목 등록</h3>
                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; align-items: end;">
-                    <div><label>품목명</label><input type="text" id="mName"></div>
+                    <div><label>품목명</label><input type="text" id="mName" placeholder="품목명 입력"></div>
                     <div><label>판매가</label><input type="number" id="mPrice" value="0"></div>
                     <div><label>기초 재고</label><input type="number" id="mQty" value="0"></div>
                 </div>
@@ -84,16 +93,18 @@
                 </div>
                 <div style="display: flex; gap: 10px; align-items: flex-end;">
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">반영하기</button></div>
+                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
             </div>
 
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
-                <input type="text" id="exName" placeholder="엑셀 상품명 복사">
+                <label>엑셀 상품명 그대로 복사</label>
+                <input type="text" id="exName" placeholder="예: [특가] 레이니 네오 글래스">
+                <label>연결할 내부 품목 선택</label>
                 <div id="itemChecks" class="check-area"></div>
                 <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 규칙 저장</button>
-                <button class="btn" style="width:100%; margin-top:8px; background:#636e72; color:white;" onclick="openMapModal()">📋 매칭 규칙 확인</button>
+                <button class="btn" style="width:100%; margin-top:8px; background:#636e72; color:white;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
             </div>
 
             <div class="card">
@@ -104,20 +115,28 @@
     </div>
 </div>
 
-<div id="modalOverlay"><div class="modal-content"><h3>매칭 규칙 내역</h3><span style="float:right; cursor:pointer;" onclick="closeMapModal()">[닫기]</span><table><thead><tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr></thead><tbody id="modalTableBody"></tbody></table></div></div>
+<div id="modalOverlay">
+    <div class="modal-content">
+        <h3>매칭 규칙 내역</h3>
+        <span style="float:right; cursor:pointer;" onclick="closeMapModal()">[닫기]</span>
+        <table>
+            <thead><tr><th>엑셀 상품명</th><th>연결 품목</th><th>삭제</th></tr></thead>
+            <tbody id="modalTableBody"></tbody>
+        </table>
+    </div>
+</div>
 
 <script>
-    // ★★★ 중요: 여기에 본인의 구글 웹 앱 URL을 넣으세요 ★★★
+    // ★★★ 중요: 여기에 본인의 구글 웹 앱 URL을 붙여넣으세요 ★★★
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
 
     let db_master = [];
     let db_map = [];
     let db_history = [];
 
-    // 로딩 토글
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
 
-    // 클라우드 데이터 불러오기
+    // 1. 클라우드에서 데이터 가져오기
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -127,11 +146,14 @@
             db_map = data.map || [];
             db_history = data.history || [];
             render();
-        } catch (e) { alert("데이터 로딩 실패!"); }
+        } catch (e) { 
+            console.error(e);
+            alert("클라우드 데이터를 불러오지 못했습니다. URL과 권한 설정을 확인하세요."); 
+        }
         toggleLoading(false);
     }
 
-    // 클라우드 데이터 저장
+    // 2. 클라우드에 데이터 저장하기
     async function saveToCloud() {
         toggleLoading(true);
         try {
@@ -140,16 +162,50 @@
                 body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history })
             });
             render();
-        } catch (e) { alert("저장 실패!"); }
+        } catch (e) { 
+            alert("저장에 실패했습니다."); 
+        }
         toggleLoading(false);
     }
 
-    // 나머지 함수들 (기존 로직과 동일하되 saveToCloud 호출)
+    // 3. 로컬 백업 불러오기 (복구 후 서버 전송)
+    function importData(e) {
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            try {
+                const data = JSON.parse(event.target.result);
+                if (confirm("백업 파일로 클라우드 데이터를 덮어쓰시겠습니까?")) {
+                    db_master = data.master || [];
+                    db_map = data.map || [];
+                    db_history = data.history || [];
+                    await saveToCloud();
+                    alert("성공적으로 복구되었습니다.");
+                }
+            } catch (err) { alert("올바른 백업 파일이 아닙니다."); }
+        };
+        reader.readAsText(e.target.files[0]);
+    }
+
+    // --- 비즈니스 로직 함수들 ---
     function getToday() { return new Date().toISOString().slice(0, 10); }
+
     function addHistory(itemName, qty) {
         const date = getToday();
         const existing = db_history.find(h => h.date === date && h.name === itemName);
         if(existing) existing.qty += qty; else db_history.push({ date, name: itemName, qty });
+    }
+
+    async function addItem() {
+        const name = document.getElementById('mName').value.trim();
+        if(!name) return;
+        db_master.push({ 
+            name, 
+            price: parseInt(document.getElementById('mPrice').value)||0, 
+            initial: parseInt(document.getElementById('mQty').value)||0, 
+            sold: 0 
+        });
+        await saveToCloud();
+        document.getElementById('mName').value = "";
     }
 
     async function applyDirectSale() {
@@ -160,23 +216,6 @@
         if(item) { item.sold += qty; addHistory(itemName, qty); await saveToCloud(); }
     }
 
-    async function addItem() {
-        const name = document.getElementById('mName').value.trim();
-        if(!name) return;
-        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
-        await saveToCloud();
-        document.getElementById('mName').value = "";
-    }
-
-    async function addMap() {
-        const exName = document.getElementById('exName').value.trim();
-        const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-        if(!exName || targets.length === 0) return;
-        db_map.push({ exName, targets });
-        await saveToCloud();
-        document.getElementById('exName').value = "";
-    }
-
     function loadExcel() {
         const file = document.getElementById('exFile').files[0];
         if(!file) return;
@@ -185,57 +224,86 @@
             const data = new Uint8Array(e.target.result);
             const wb = XLSX.read(data, { type: 'array' });
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+            let count = 0;
             rows.forEach(row => {
-                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'];
-                const qty = parseInt(row['수량'] || row['구매수량']) || 1;
+                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'] || row['상품이름'];
+                const qty = parseInt(row['수량'] || row['구매수량'] || row['주문수량'] || row['구매수(수량)']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
                         const item = db_master.find(i => i.name === tName); 
-                        if(item) { item.sold += qty; addHistory(tName, qty); } 
+                        if(item) { item.sold += qty; addHistory(tName, qty); count++; } 
                     });
                 }
             });
             await saveToCloud();
+            alert(count + "건이 반영되었습니다.");
         };
         reader.readAsArrayBuffer(file);
     }
 
-    // 엑셀 다운로드, 모달 관리 등 부가 기능
+    async function addMap() {
+        const exName = document.getElementById('exName').value.trim();
+        const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+        if(!exName || targets.length === 0) return alert("매칭 정보를 확인하세요.");
+        db_map.push({ exName, targets });
+        await saveToCloud();
+        document.getElementById('exName').value = "";
+    }
+
+    // --- 기타 유틸리티 ---
     function downloadCurrentStatus() {
-        const data = db_master.map(item => ({ "품목명": item.name, "단가": item.price, "재고": item.initial - item.sold }));
+        const data = db_master.map(item => ({ 
+            "품목명": item.name, "단가": item.price, "기초재고": item.initial, 
+            "누적판매": item.sold, "현재재고": item.initial - item.sold, "누적매출": item.sold * item.price 
+        }));
         const ws = XLSX.utils.json_to_sheet(data);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "현황");
         XLSX.writeFile(wb, `SKY_재고현황_${getToday()}.xlsx`);
     }
 
-    async function stockIn(idx) { const val = prompt("입고량:"); if(val) { db_master[idx].initial += parseInt(val); await saveToCloud(); } }
-    async function editItem(idx) { const val = prompt("실재고(누적판매0리셋):"); if(val!==null){ db_master[idx].initial=parseInt(val); db_master[idx].sold=0; await saveToCloud(); } }
-    async function delItem(idx) { if(confirm("삭제?")) { db_master.splice(idx,1); await saveToCloud(); } }
+    async function stockIn(idx) { const v = prompt("입고 수량:"); if(v) { db_master[idx].initial += parseInt(v); await saveToCloud(); } }
+    async function editItem(idx) { const v = prompt("실재고로 수정 (누적판매는 0으로 초기화됨):"); if(v!==null){ db_master[idx].initial=parseInt(v); db_master[idx].sold=0; await saveToCloud(); } }
+    async function delItem(idx) { if(confirm("품목을 삭제하시겠습니까?")) { db_master.splice(idx,1); await saveToCloud(); } }
     async function delMap(idx) { db_map.splice(idx, 1); await saveToCloud(); openMapModal(); }
-    function openMapModal() { const tbody = document.getElementById('modalTableBody'); tbody.innerHTML = ""; db_map.forEach((m, idx) => { tbody.innerHTML += `<tr><td>${m.exName}</td><td>${m.targets.join(', ')}</td><td><button onclick="delMap(${idx})">삭제</button></td></tr>`; }); document.getElementById('modalOverlay').style.display = 'block'; }
+    function openMapModal() { const tb = document.getElementById('modalTableBody'); tb.innerHTML = ""; db_map.forEach((m, i) => { tb.innerHTML += `<tr><td>${m.exName}</td><td>${m.targets.join(', ')}</td><td><button onclick="delMap(${i})">삭제</button></td></tr>`; }); document.getElementById('modalOverlay').style.display = 'block'; }
     function closeMapModal() { document.getElementById('modalOverlay').style.display = 'none'; }
-    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Cloud_Backup.json`; a.click(); }
+    function exportData() { const blob = new Blob([JSON.stringify({ master: db_master, map: db_map, history: db_history })], {type: "application/json"}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `SKY_Cloud_Backup_${getToday()}.json`; a.click(); }
 
     function render() {
         const table = document.getElementById('mainTable');
         const checks = document.getElementById('itemChecks');
         const directSelect = document.getElementById('directItemSelect');
         const historyList = document.getElementById('historyContainer');
-        let total = 0; table.innerHTML = "";
-        directSelect.innerHTML = `<option value="">-- 품목 선택 --</option>`;
+        let totalSales = 0;
+
+        table.innerHTML = "";
+        directSelect.innerHTML = `<option value="">-- 품목 직접 선택 --</option>`;
         db_master.forEach((item, idx) => {
             const current = item.initial - item.sold;
-            const sales = item.sold * item.price; total += sales;
-            table.innerHTML += `<tr><td style="text-align:left"><strong>${item.name}</strong></td><td>${item.price.toLocaleString()}</td><td>${item.initial}</td><td>${item.sold}</td><td style="font-weight:bold; color:${current < 10 ? '#e74c3c':'#2c3e50'}">${current}</td><td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td><td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td></tr>`;
+            const sales = item.sold * item.price;
+            totalSales += sales;
+            table.innerHTML += `<tr>
+                <td style="text-align:left"><strong>${item.name}</strong></td>
+                <td>${item.price.toLocaleString()}</td>
+                <td>${item.initial}</td>
+                <td>${item.sold}</td>
+                <td style="font-weight:bold; color:${current < 10 ? '#e74c3c':'#2c3e50'}">${current}</td>
+                <td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td>
+                <td>
+                    <button class="btn" style="background:#2980b9; color:white; padding:4px 8px; font-size:11px;" onclick="stockIn(${idx})">입고</button>
+                    <button class="btn" style="background:#f39c12; color:white; padding:4px 8px; font-size:11px;" onclick="editItem(${idx})">수정</button>
+                    <button class="btn" style="background:#e74c3c; color:white; padding:4px 8px; font-size:11px;" onclick="delItem(${idx})">삭제</button>
+                </td>
+            </tr>`;
             directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
         });
-        document.getElementById('totalSales').innerText = total.toLocaleString();
-        checks.innerHTML = "";
-        db_master.forEach(item => { checks.innerHTML += `<label class="chk-item" for="c_${item.name}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="c_${item.name}"></label>`; });
+        document.getElementById('totalSales').innerText = totalSales.toLocaleString();
 
-        // 기록 렌더링
+        checks.innerHTML = "";
+        db_master.forEach(item => { checks.innerHTML += `<label class="chk-item"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}"></label>`; });
+
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
@@ -243,12 +311,11 @@
             grouped[date].forEach(item => { historyHTML += `<div style="display:flex; justify-content:space-between; padding:2px 5px;"><span>${item.name}</span><b>${item.qty}개</b></div>`; });
             historyHTML += `</div>`;
         });
-        historyList.innerHTML = historyHTML || "기록 없음";
+        historyList.innerHTML = historyHTML || "<p style='text-align:center; color:#999;'>기록이 없습니다.</p>";
     }
 
-    // 초기 실행 시 데이터 로드
+    // 초기 구동: 클라우드 데이터 로드
     loadFromCloud();
 </script>
 </body>
 </html>
-
