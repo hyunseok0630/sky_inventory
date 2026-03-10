@@ -2,20 +2,21 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud (Sorted Checklist)</title>
+    <title>SKY Commerce Inventory - Cloud (Professional UI)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; }
         #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
+        
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
         .btn-backup { background: #636e72; color: white; padding: 8px 12px; font-size: 12px; border-radius: 6px; border:none; cursor:pointer; }
+        
         .main-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
-        /* 검색창 스타일 */
         .search-box { position: relative; margin-bottom: 0; }
         .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); height: 38px; }
         .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 8px; font-size: 16px; }
@@ -30,9 +31,46 @@
         td { font-size: 14px; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
-        .chk-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; transition: 0.2s; }
-        .chk-item:hover { background: #f1f1f1; }
+
+        /* --- 2. 플랫폼 매칭 리스트 개선 디자인 --- */
+        .check-area { 
+            height: 320px; 
+            overflow-y: auto; 
+            border: 1px solid var(--border); 
+            border-radius: 8px; 
+            background: #fff; 
+            margin-bottom: 15px;
+        }
+        .chk-item { 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between; 
+            padding: 12px 16px; 
+            border-bottom: 1px solid #f1f3f5; 
+            cursor: pointer; 
+            transition: background 0.2s;
+        }
+        .chk-item:hover { background: #f8f9fa; }
+        .chk-item:last-child { border-bottom: none; }
+        .chk-item span { 
+            font-size: 14px; 
+            color: #333; 
+            font-weight: 500;
+            line-height: 1.4;
+            flex: 1;
+            margin-right: 15px;
+            word-break: keep-all;
+        }
+        /* 체크박스 커스텀 정렬 */
+        .chk-item input[type="checkbox"] { 
+            width: 18px; 
+            height: 18px; 
+            margin: 0; 
+            cursor: pointer;
+            accent-color: var(--primary); /* 체크박스 포인트 색상 */
+        }
+        /* -------------------------------------- */
+
         .history-list { max-height: 450px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
@@ -102,17 +140,16 @@
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
                     <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
-                <small style="color:#777;">* 엑셀 파일명에 판매처(쿠팡, 네이버 등)를 포함하세요.</small>
             </div>
 
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
                 <label>엑셀 상품명 그대로 복사</label>
                 <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
-                <label>연결할 내부 품목 선택 (가나다순 정렬됨)</label>
+                <label>연결할 내부 품목 선택 (가나다순)</label>
                 <div id="itemChecks" class="check-area"></div>
-                <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 규칙 저장</button>
-                <button class="btn" style="width:100%; margin-top:8px; background:#636e72; color:white;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
+                <button class="btn btn-main" style="background: var(--accent); margin-bottom: 8px;" onclick="addMap()">매칭 규칙 저장</button>
+                <button class="btn" style="width:100%; background:#636e72; color:white;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
             </div>
 
             <div class="card">
@@ -290,7 +327,6 @@
         table.innerHTML = "";
         directSelect.innerHTML = `<option value="">-- 품목 선택 --</option>`;
         
-        // 1. 실시간 재고 현황 및 매출 합계 계산 (원본 데이터 순서 유지)
         db_master.forEach((item, idx) => {
             const current = item.initial - item.sold;
             const sales = item.sold * item.price;
@@ -310,20 +346,24 @@
         });
         document.getElementById('totalSales').innerText = dailyTotal.toLocaleString();
 
-        // 2. 매칭용 체크박스 및 직접입력 셀렉트박스 정렬 (가나다순)
+        // 매칭용 체크박스 및 드롭다운 (가나다순)
         checks.innerHTML = "";
         const sortedItems = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         
         sortedItems.forEach((item) => { 
-            // 직접입력 셀렉트박스 추가
             directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
             
-            // 매칭 체크박스 추가
-            const chkId = `chk_${item.name.replace(/\s+/g, '_')}`; // 공백 대응 ID
-            checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
+            const chkId = `chk_${item.name.replace(/\s+/g, '_')}`;
+            // 개선된 리스트 아이템 레이아웃
+            checks.innerHTML += `
+                <label class="chk-item" for="${chkId}">
+                    <span>${item.name}</span>
+                    <input type="checkbox" class="chk" value="${item.name}" id="${chkId}">
+                </label>
+            `; 
         });
 
-        // 3. 히스토리 렌더링
+        // 히스토리 렌더링
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
