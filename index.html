@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud (Daily Reset)</title>
+    <title>SKY Commerce Inventory - Cloud (Search Enabled)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
@@ -14,14 +14,22 @@
         .main-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
+        
+        /* 검색창 스타일 */
+        .search-box { position: relative; margin-bottom: 15px; }
+        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); }
+        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 10px; font-size: 16px; }
+
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .btn-excel-dl { background: #2ecc71; color: white; width: 100%; padding: 12px; margin-top: 10px; font-size: 14px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
         th, td { border: 1px solid var(--border); padding: 10px 8px; text-align: center; }
-        th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; } /* 헤더 고정 */
+        th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         td { font-size: 14px; }
+        
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
         .chk-item { padding: 12px 15px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; transition: 0.2s; }
@@ -33,23 +41,11 @@
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
         .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px dashed #ddd; }
         
-        /* --- 모달 스크롤 수정 부분 --- */
         #modalOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; }
-        .modal-content { 
-            position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); 
-            background:white; padding:25px; border-radius:12px; 
-            width:90%; max-width:800px; 
-            max-height: 80vh; /* 화면 높이의 80%까지만 확장 */
-            display: flex; flex-direction: column; 
-        }
-        .modal-body { 
-            overflow-y: auto; /* 내용이 많으면 스크롤 생성 */
-            margin-top: 15px;
-            border: 1px solid var(--border);
-        }
+        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:90%; max-width:800px; max-height: 80vh; display: flex; flex-direction: column; }
+        .modal-body { overflow-y: auto; margin-top: 15px; border: 1px solid var(--border); }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
         .modal-header h3 { border: none; margin: 0; padding: 0; }
-        /* --------------------------- */
     </style>
 </head>
 <body>
@@ -68,7 +64,12 @@
     <div class="main-layout">
         <div class="left-panel">
             <div class="card">
-                <h3>4. 실시간 재고 및 매출 현황</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="margin-bottom:0; border:none;">4. 실시간 재고 및 매출 현황</h3>
+                    <div class="search-box" style="width: 250px; margin-bottom:0;">
+                        <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
+                    </div>
+                </div>
                 <table>
                     <thead>
                         <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>당일판매</th><th>현재재고</th><th>당일매출</th><th>관리</th></tr>
@@ -76,7 +77,7 @@
                     <tbody id="mainTable"></tbody>
                 </table>
                 <div class="summary">
-                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">당일 매출 합계:</span><br>
+                    <span style="font-size: 0.9rem; font-weight: normal; opacity: 0.8;">당일 매출 합계 (검색 포함 전체):</span><br>
                     <span id="totalSales">0</span>원
                 </div>
                 <button class="btn btn-excel-dl" onclick="downloadCurrentStatus()">📊 현재 현황 엑셀 다운로드</button>
@@ -274,22 +275,29 @@
         const checks = document.getElementById('itemChecks');
         const directSelect = document.getElementById('directItemSelect');
         const historyList = document.getElementById('historyContainer');
-        let dailyTotal = 0; table.innerHTML = "";
+        const searchTerm = document.getElementById('inventorySearch').value.toLowerCase(); // 검색어 획득
+        
+        let dailyTotal = 0; 
+        table.innerHTML = "";
         directSelect.innerHTML = `<option value="">-- 품목 선택 --</option>`;
         
         db_master.forEach((item, idx) => {
             const current = item.initial - item.sold;
             const sales = item.sold * item.price;
             dailyTotal += sales;
-            table.innerHTML += `<tr>
-                <td style="text-align:left"><strong>${item.name}</strong></td>
-                <td>${item.price.toLocaleString()}</td>
-                <td>${item.initial}</td>
-                <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                <td style="font-weight:bold;">${current}</td>
-                <td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td>
-                <td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td>
-            </tr>`;
+
+            // 검색어 필터링 조건
+            if (item.name.toLowerCase().includes(searchTerm)) {
+                table.innerHTML += `<tr>
+                    <td style="text-align:left"><strong>${item.name}</strong></td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${item.initial}</td>
+                    <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
+                    <td style="font-weight:bold;">${current}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${sales.toLocaleString()}</td>
+                    <td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td>
+                </tr>`;
+            }
             directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
         });
         document.getElementById('totalSales').innerText = dailyTotal.toLocaleString();
