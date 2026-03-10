@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce Inventory - Cloud (Source Tracking)</title>
+    <title>SKY Commerce Inventory - Cloud (Sorted Checklist)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; }
@@ -102,14 +102,14 @@
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
                     <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px; margin-bottom:15px;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
-                <small style="color:#777;">* 엑셀 파일명에 '쿠팡', '네이버' 등 판매처를 포함하면 자동으로 분류됩니다.</small>
+                <small style="color:#777;">* 엑셀 파일명에 판매처(쿠팡, 네이버 등)를 포함하세요.</small>
             </div>
 
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
                 <label>엑셀 상품명 그대로 복사</label>
                 <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
-                <label>연결할 내부 품목 선택</label>
+                <label>연결할 내부 품목 선택 (가나다순 정렬됨)</label>
                 <div id="itemChecks" class="check-area"></div>
                 <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 규칙 저장</button>
                 <button class="btn" style="width:100%; margin-top:8px; background:#636e72; color:white;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
@@ -186,16 +186,10 @@
         toggleLoading(false);
     }
 
-    // 수정된 히스토리 추가 함수: 판매처(source) 파라미터 추가
     function addHistory(itemName, qty, source = "직접입력") {
         const date = getToday();
-        // 날짜, 품목명, 판매처가 모두 같은 경우에만 누적
         const existing = db_history.find(h => h.date === date && h.name === itemName && h.source === source);
-        if(existing) {
-            existing.qty += qty;
-        } else {
-            db_history.push({ date, name: itemName, qty, source });
-        }
+        if(existing) { existing.qty += qty; } else { db_history.push({ date, name: itemName, qty, source }); }
     }
 
     async function addItem() {
@@ -211,11 +205,7 @@
         const qty = parseInt(document.getElementById('directQty').value) || 0;
         if(!itemName || qty <= 0) return;
         const item = db_master.find(i => i.name === itemName);
-        if(item) { 
-            item.sold += qty; 
-            addHistory(itemName, qty, "수기반영"); 
-            await saveToCloud(); 
-        }
+        if(item) { item.sold += qty; addHistory(itemName, qty, "수기반영"); await saveToCloud(); }
     }
 
     function loadExcel() {
@@ -223,7 +213,6 @@
         const file = fileInput.files[0];
         if(!file) return;
 
-        // 파일명에서 판매처 추출 (예: '쿠팡_매출현황.xlsx' -> '쿠팡')
         const fileName = file.name;
         let source = "기타엑셀";
         if(fileName.includes("쿠팡")) source = "쿠팡";
@@ -245,15 +234,12 @@
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
                         const item = db_master.find(i => i.name === tName); 
-                        if(item) { 
-                            item.sold += qty; 
-                            addHistory(tName, qty, source); // 추출한 source 전달
-                        } 
+                        if(item) { item.sold += qty; addHistory(tName, qty, source); } 
                     });
                 }
             });
             await saveToCloud();
-            fileInput.value = ""; // 파일 선택 초기화
+            fileInput.value = "";
         };
         reader.readAsArrayBuffer(file);
     }
@@ -304,6 +290,7 @@
         table.innerHTML = "";
         directSelect.innerHTML = `<option value="">-- 품목 선택 --</option>`;
         
+        // 1. 실시간 재고 현황 및 매출 합계 계산 (원본 데이터 순서 유지)
         db_master.forEach((item, idx) => {
             const current = item.initial - item.sold;
             const sales = item.sold * item.price;
@@ -320,17 +307,23 @@
                     <td><button class="btn" onclick="stockIn(${idx})">입고</button> <button class="btn" onclick="editItem(${idx})">수정</button> <button class="btn" onclick="delItem(${idx})">삭제</button></td>
                 </tr>`;
             }
-            directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
         });
         document.getElementById('totalSales').innerText = dailyTotal.toLocaleString();
 
+        // 2. 매칭용 체크박스 및 직접입력 셀렉트박스 정렬 (가나다순)
         checks.innerHTML = "";
-        db_master.forEach((item, idx) => { 
-            const chkId = `chk_${idx}`;
+        const sortedItems = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+        
+        sortedItems.forEach((item) => { 
+            // 직접입력 셀렉트박스 추가
+            directSelect.innerHTML += `<option value="${item.name}">${item.name}</option>`;
+            
+            // 매칭 체크박스 추가
+            const chkId = `chk_${item.name.replace(/\s+/g, '_')}`; // 공백 대응 ID
             checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
         });
 
-        // 히스토리 렌더링 (판매처 태그 포함)
+        // 3. 히스토리 렌더링
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
