@@ -9,7 +9,6 @@
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; }
         
-        /* 로딩 애니메이션 */
         #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
         
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
@@ -31,8 +30,22 @@
         td { font-size: 14px; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        .check-area { height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 5px 10px; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
-        .chk-item { padding: 10px 5px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; font-size: 14px; cursor: pointer; }
+        
+        /* 매칭 설정 구역 정렬 개선 */
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid #ddd; padding: 0; margin-bottom: 10px; border-radius: 6px; background: #fafafa; }
+        .chk-item { 
+            padding: 12px 15px; 
+            border-bottom: 1px solid #eee; 
+            display: flex; 
+            justify-content: space-between; /* 텍스트 좌측, 체크박스 우측 */
+            align-items: center; 
+            font-size: 14px; 
+            cursor: pointer; 
+            transition: 0.2s;
+        }
+        .chk-item:hover { background: #f1f1f1; }
+        .chk-item span { flex: 1; margin-right: 10px; word-break: break-all; }
+        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; flex-shrink: 0; }
         
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
@@ -136,7 +149,6 @@
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
 
-    // 1. 클라우드에서 데이터 가져오기
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -148,12 +160,11 @@
             render();
         } catch (e) { 
             console.error(e);
-            alert("클라우드 데이터를 불러오지 못했습니다. URL과 권한 설정을 확인하세요."); 
+            alert("데이터 로딩 실패! URL 혹은 권한 설정을 확인하세요."); 
         }
         toggleLoading(false);
     }
 
-    // 2. 클라우드에 데이터 저장하기
     async function saveToCloud() {
         toggleLoading(true);
         try {
@@ -162,13 +173,10 @@
                 body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history })
             });
             render();
-        } catch (e) { 
-            alert("저장에 실패했습니다."); 
-        }
+        } catch (e) { alert("저장 실패!"); }
         toggleLoading(false);
     }
 
-    // 3. 로컬 백업 불러오기 (복구 후 서버 전송)
     function importData(e) {
         const reader = new FileReader();
         reader.onload = async (event) => {
@@ -186,7 +194,6 @@
         reader.readAsText(e.target.files[0]);
     }
 
-    // --- 비즈니스 로직 함수들 ---
     function getToday() { return new Date().toISOString().slice(0, 10); }
 
     function addHistory(itemName, qty) {
@@ -226,8 +233,8 @@
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             let count = 0;
             rows.forEach(row => {
-                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'] || row['상품이름'];
-                const qty = parseInt(row['수량'] || row['구매수량'] || row['주문수량'] || row['구매수(수량)']) || 1;
+                const title = row['상품명'] || row['등록상품명'] || row['주문상품명'] || row['노출상품명'];
+                const qty = parseInt(row['수량'] || row['구매수량'] || row['주문수량']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
@@ -237,7 +244,7 @@
                 }
             });
             await saveToCloud();
-            alert(count + "건이 반영되었습니다.");
+            alert(count + "건 반영 완료");
         };
         reader.readAsArrayBuffer(file);
     }
@@ -245,13 +252,12 @@
     async function addMap() {
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-        if(!exName || targets.length === 0) return alert("매칭 정보를 확인하세요.");
+        if(!exName || targets.length === 0) return alert("매칭 정보를 입력하세요.");
         db_map.push({ exName, targets });
         await saveToCloud();
         document.getElementById('exName').value = "";
     }
 
-    // --- 기타 유틸리티 ---
     function downloadCurrentStatus() {
         const data = db_master.map(item => ({ 
             "품목명": item.name, "단가": item.price, "기초재고": item.initial, 
@@ -301,8 +307,16 @@
         });
         document.getElementById('totalSales').innerText = totalSales.toLocaleString();
 
+        // [정렬 개선된 체크박스 구역]
         checks.innerHTML = "";
-        db_master.forEach(item => { checks.innerHTML += `<label class="chk-item"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}"></label>`; });
+        db_master.forEach((item, idx) => { 
+            const chkId = `chk_${idx}`;
+            checks.innerHTML += `
+                <label class="chk-item" for="${chkId}">
+                    <span>${item.name}</span>
+                    <input type="checkbox" class="chk" value="${item.name}" id="${chkId}">
+                </label>`; 
+        });
 
         const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
         let historyHTML = "";
@@ -314,7 +328,6 @@
         historyList.innerHTML = historyHTML || "<p style='text-align:center; color:#999;'>기록이 없습니다.</p>";
     }
 
-    // 초기 구동: 클라우드 데이터 로드
     loadFromCloud();
 </script>
 </body>
