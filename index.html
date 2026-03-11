@@ -141,7 +141,7 @@
 
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
-                <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
+                <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기 (옵션 포함)">
                 <div id="itemChecks" class="check-area"></div>
                 <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매치 저장</button>
                 <button class="btn" style="width:100%; background:#636e72; color:white; margin-top:8px;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
@@ -354,13 +354,16 @@
                 let headerRowIdx = -1;
                 let titleColIdx = -1;
                 let qtyColIdx = -1;
+                let optColIdx = -1;
 
+                // ★ 옵션(옵션정보, 옵션명) 열을 추가로 검색합니다.
                 for (let i = 0; i < Math.min(20, rawData.length); i++) {
                     const row = rawData[i];
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j]).replace(/\s/g, '');
-                        if (cellVal.match(/상품명|옵션명|상품이름|주문상품|제품명/)) titleColIdx = j;
-                        if (cellVal.match(/수량|구매수/)) qtyColIdx = j;
+                        if (cellVal.match(/상품명|상품이름|주문상품|제품명/)) titleColIdx = j;
+                        else if (cellVal.match(/옵션정보|옵션명|선택옵션/)) optColIdx = j;
+                        else if (cellVal.match(/수량|구매수/)) qtyColIdx = j;
                     }
                     if (titleColIdx !== -1) { headerRowIdx = i; break; }
                 }
@@ -381,13 +384,21 @@
                     if(!rawTitle || String(rawTitle).trim() === "") continue; 
 
                     parsedRows++;
+                    
+                    // ★ 상품명과 옵션명을 가져와 하나로 예쁘게 합칩니다.
                     const title = String(rawTitle).trim(); 
+                    const opt = (optColIdx !== -1 && row[optColIdx]) ? String(row[optColIdx]).trim() : "";
+                    const fullTitle = opt ? `${title} [${opt}]` : title;
+
                     let qty = 1;
                     if (qtyColIdx !== -1 && row[qtyColIdx]) {
                         qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, '')) || 1;
                     }
 
-                    const rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title));
+                    // ★ 다단계 매칭 (가장 정확한 것부터 순서대로 찾기)
+                    let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle)); // 1. 전체 풀네임 검색
+                    if (!rule && opt) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(opt)); // 2. 옵션명으로만 검색
+                    if (!rule) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title)); // 3. 상품명으로만 검색
                     
                     if(rule) {
                         let appliedToItem = false;
@@ -402,8 +413,8 @@
                                 } 
                             });
                         }
-                        if(!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${title} 👉 연결대상: ${rule.targets.join(', ')}`);
-                    } else failNames.add(title); 
+                        if(!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${fullTitle} 👉 연결대상: ${rule.targets.join(', ')}`);
+                    } else failNames.add(fullTitle); 
                 }
 
                 if(applyCount > 0) {
