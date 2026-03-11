@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce - Smart History Management</title>
+    <title>SKY Commerce - Smart Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
@@ -17,55 +17,42 @@
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
-        /* 인벤토리 테이블 */
-        .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
-        .search-box { position: relative; flex: 1; max-width: 300px; }
-        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); height: 40px; }
-        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 10px; font-size: 16px; }
-        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; padding: 0 20px; font-size: 14px; white-space: nowrap; }
-
-        input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
-        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; transition: 0.3s; font-size: 13px; }
-        .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
-        
+        /* 4. 실시간 현황 테이블 */
         table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; }
         th, td { border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
+        /* 당일 매출 합계 영역 */
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
-        /* 매칭 체크박스 정렬 */
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
-        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
-        .chk-item span { font-size: 14px; flex: 1; text-align: left; }
-        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; flex-shrink: 0; accent-color: var(--primary); }
-        
-        /* 버튼 높낮이 정렬 고정 */
-        .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
-        .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; box-sizing: border-box; }
-
-        /* 히스토리 디자인 및 색상 태그 */
+        /* 5. 전체 판매 히스토리 스타일 */
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
-        .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
-        .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border: 1px solid #bbdefb; }
-        .tag-네이버 { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
-        .tag-기타 { background: #f5f5f5; color: #616161; border: 1px solid #e0e0e0; }
-        .tag-수기 { background: #fff3e0; color: #ef6c00; border: 1px solid #ffe0b2; }
+        .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
+        .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
+        .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
+        .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
+        .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
-        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
-        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; }
+        /* 기타 UI 요소 */
+        input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
+        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
+        .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 5px; }
+        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #f1f3f5; }
     </style>
 </head>
 <body>
 
-<div id="loadingOverlay">☁️ 데이터 동기화 중...</div>
+<div id="loadingOverlay">☁️ 데이터를 동기화하고 있습니다...</div>
 
 <div class="container">
     <div class="backup-group">
-        <div style="margin-right:auto; color:var(--secondary); font-weight:bold; font-size:14px;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
+        <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
         <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침</button>
         <button class="btn-backup" onclick="exportData()">💾 로컬 백업</button>
         <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 복구</button>
@@ -75,28 +62,28 @@
     <div class="main-layout">
         <div class="left-panel">
             <div class="card">
-                <div class="inventory-header">
-                    <h3 style="margin:0; border:none; padding:0;">4. 실시간 재고 및 매출 현황</h3>
-                    <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end;">
-                        <div class="search-box"><input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()"></div>
-                        <button class="btn btn-top-mgmt" onclick="openMgmtModal()">⚙️ 품목 관리</button>
-                    </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; border:none;">4. 실시간 재고 및 매출 현황</h3>
+                    <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()" style="width:200px; margin:0;">
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>당일판매</th><th>현재재고</th><th>당일매출</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초</th><th>판매</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
-                <div class="summary">당일 매출 합계: <br><span id="totalSales">0</span>원</div>
+                <div class="summary">
+                    당일 매출 합계: <br>
+                    <span id="totalSales">0</span>원
+                </div>
             </div>
 
             <div class="card">
                 <h3>1. 신규 품목 등록</h3>
                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
-                    <div><label>품목명</label><input type="text" id="mName"></div>
-                    <div><label>판매가</label><input type="number" id="mPrice" value="0"></div>
-                    <div><label>기초 재고</label><input type="number" id="mQty" value="0"></div>
+                    <input type="text" id="mName" placeholder="품목명">
+                    <input type="number" id="mPrice" placeholder="단가" value="0">
+                    <input type="number" id="mQty" placeholder="기초재고" value="0">
                 </div>
                 <button class="btn btn-main" onclick="addItem()">품목 리스트 추가</button>
             </div>
@@ -106,23 +93,21 @@
             <div class="card">
                 <h3>3. 판매 데이터 적용</h3>
                 <div class="action-row">
-                    <div style="flex: 2;"><select id="directItemSelect"></select></div>
-                    <div style="flex: 1;"><input type="number" id="directQty" value="1" min="1"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--point); color:white;" onclick="applyDirectSale()">즉시 반영</button></div>
+                    <select id="directItemSelect"></select>
+                    <input type="number" id="directQty" value="1" min="1">
+                    <button class="btn" style="background:var(--point); color:white;" onclick="applyDirectSale()">수기반영</button>
                 </div>
                 <div class="action-row">
-                    <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀 반영</button></div>
+                    <input type="file" id="exFile" accept=".xlsx, .xls">
+                    <button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀반영</button>
                 </div>
             </div>
 
             <div class="card">
                 <h3>2. 플랫폼 상품 매칭 설정</h3>
-                <label>엑셀 상품명 그대로 복사</label>
                 <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
-                <label>연결할 내부 품목 선택 (가나다순)</label>
                 <div id="itemChecks" class="check-area"></div>
-                <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 규칙 저장</button>
+                <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매치 저장</button>
             </div>
 
             <div class="card">
@@ -133,62 +118,56 @@
     </div>
 </div>
 
-<div id="mgmtModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 style="text-align:center;">품목 관리 메뉴</h3>
-        <button class="btn btn-main" style="background:#f8f9fa; color:#333; border:1px solid #ddd; margin-bottom:10px; text-align:left;" onclick="openActionModal('in')">📦 입고 수량 추가</button>
-        <button class="btn btn-main" style="background:#f8f9fa; color:#333; border:1px solid #ddd; margin-bottom:10px; text-align:left;" onclick="openActionModal('edit')">✏️ 재고 수량 수정</button>
-        <button class="btn btn-main" style="background:#f8f9fa; color:#333; border:1px solid #ddd; margin-bottom:10px; text-align:left;" onclick="openActionModal('del')">❌ 품목 삭제</button>
-        <button class="btn" style="width:100%; margin-top:10px;" onclick="closeMgmtModal()">닫기</button>
-    </div>
-</div>
-
-<div id="actionModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 id="actionTitle">관리 작업</h3>
-        <select id="actionItemSelect"></select>
-        <div id="qtyInputArea"><label id="qtyLabel">수량</label><input type="number" id="actionQty" value="0"></div>
-        <div id="deleteConfirmMsg" style="display:none; color:var(--danger); font-weight:bold; margin:10px 0;">정말로 삭제하시겠습니까?</div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px;">
-            <button class="btn" onclick="closeActionModal()">취소</button>
-            <button id="actionConfirmBtn" class="btn btn-main">확인</button>
-        </div>
-    </div>
-</div>
-
 <script>
+    // Google App Script URL
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
-    let db_master = [], db_map = [], db_history = [], g_lastDate = "";
+    
+    let db_master = [], db_map = [], db_history = [];
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toISOString().slice(0, 10); }
 
+    // 클라우드 데이터 로드
     async function loadFromCloud() {
         toggleLoading(true);
         try {
             const resp = await fetch(G_SCRIPT_URL);
             const data = await resp.json();
-            db_master = data.master || []; db_map = data.map || []; db_history = data.history || [];
-            const today = getToday();
+            db_master = data.master || [];
+            db_map = data.map || [];
+            db_history = data.history || [];
             
+            // 날짜 변경 시 재고 이월 로직
+            const today = getToday();
             if (data.lastDate && data.lastDate < today) {
-                db_master.forEach(i => { i.initial = (i.initial - i.sold); i.sold = 0; });
+                db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
                 await saveToCloud();
             }
             document.getElementById('currentDateDisp').innerText = today;
             render();
-        } catch (e) { console.error(e); }
+        } catch (e) { alert("데이터 연동 오류!"); }
         toggleLoading(false);
     }
 
+    // 클라우드 데이터 저장
     async function saveToCloud() {
         toggleLoading(true);
-        await fetch(G_SCRIPT_URL, { method: "POST", body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })});
+        // history 객체에 source 정보가 포함되어 전송됩니다.
+        await fetch(G_SCRIPT_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ 
+                action: "save", 
+                master: db_master, 
+                map: db_map, 
+                history: db_history, 
+                lastDate: getToday() 
+            })
+        });
         render();
         toggleLoading(false);
     }
 
-    // --- 엑셀 파일명 자동 인식 로직 업데이트 ---
+    // 엑셀 분석 및 판매처 자동 분류
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -197,10 +176,8 @@
         let source = "기타";
         const fileName = file.name;
         
-        // 새로운 파일명 규칙 적용
         if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
-        else source = fileName.split('.')[0]; 
 
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -226,80 +203,68 @@
     }
 
     function addHistory(name, qty, source) {
-        db_history.push({ date: getToday(), name, qty, source });
+        db_history.push({ date: getToday(), name: name, qty: qty, source: source });
     }
 
+    // 핵심: 실시간 렌더링 및 매출 합계 계산
     function render() {
-        // 테이블 렌더링
         const table = document.getElementById('mainTable');
         const search = document.getElementById('inventorySearch').value.toLowerCase();
-        table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => `
-            <tr>
-                <td style="text-align:left"><b>${item.name}</b></td>
-                <td>${item.price.toLocaleString()}</td>
-                <td>${item.initial}</td>
-                <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                <td>${item.initial - item.sold}</td>
-                <td style="color:var(--accent); font-weight:bold;">${(item.sold * item.price).toLocaleString()}</td>
-            </tr>
-        `).join('');
+        let dayTotalSales = 0; // 합계 변수 초기화
 
-        // 품목 선택박스 & 체크박스
+        // 1. 재고 테이블 및 매출 합산
+        table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => {
+            const currentStock = item.initial - item.sold;
+            const salesAmount = item.sold * item.price;
+            dayTotalSales += salesAmount; // 실시간 합산
+
+            return `
+                <tr>
+                    <td style="text-align:left"><b>${item.name}</b></td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${item.initial}</td>
+                    <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
+                    <td>${currentStock}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td>
+                </tr>
+            `;
+        }).join('');
+
+        // 2. 매출 합계 텍스트 업데이트 (오류 수정 지점)
+        document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
+
+        // 3. 히스토리 렌더링 (판매처 포함)
+        const historyList = document.getElementById('historyContainer');
+        const grouped = db_history.reduce((acc, obj) => { 
+            acc[obj.date] = acc[obj.date] || {};
+            acc[obj.date][obj.name] = acc[obj.date][obj.name] || {};
+            let s = obj.source || '수기';
+            acc[obj.date][obj.name][s] = (acc[obj.date][obj.name][s] || 0) + obj.qty;
+            return acc; 
+        }, {});
+
+        let hHtml = "";
+        Object.keys(grouped).sort().reverse().forEach(date => {
+            hHtml += `<div class="history-day"><div class="history-date">${date}</div>`;
+            Object.keys(grouped[date]).forEach(name => {
+                let total = 0, tags = "";
+                Object.keys(grouped[date][name]).forEach(src => {
+                    total += grouped[date][name][src];
+                    const cls = `tag-${src}`;
+                    tags += `<span class="source-tag ${cls}">${src} ${grouped[date][name][src]}</span> `;
+                });
+                hHtml += `<div class="history-row"><span>${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
+            });
+            hHtml += `</div>`;
+        });
+        historyList.innerHTML = hHtml || "데이터 없음";
+
+        // 품목 선택 UI 업데이트
         document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         const sortedItems = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
         document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `
             <label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>
         `).join('');
-
-        // 히스토리 병합 렌더링
-        const historyList = document.getElementById('historyContainer');
-        const grouped = db_history.reduce((acc, obj) => { 
-            acc[obj.date] = acc[obj.date] || {};
-            acc[obj.date][obj.name] = acc[obj.date][obj.name] || {};
-            let s = (obj.source && obj.source !== 'undefined') ? obj.source : '수기';
-            acc[obj.date][obj.name][s] = (acc[obj.date][obj.name][s] || 0) + obj.qty;
-            return acc; 
-        }, {});
-
-        let html = "";
-        Object.keys(grouped).sort().reverse().forEach(date => {
-            html += `<div class="history-day"><div class="history-date">${date}</div>`;
-            Object.keys(grouped[date]).forEach(name => {
-                let total = 0, tags = "";
-                Object.keys(grouped[date][name]).forEach(src => {
-                    total += grouped[date][name][src];
-                    const cls = (src === '쿠팡' || src === '네이버') ? `tag-${src}` : (src === '수기' ? 'tag-수기' : 'tag-기타');
-                    tags += `<span class="source-tag ${cls}">${src} ${grouped[date][name][src]}</span> `;
-                });
-                html += `<div class="history-row"><span>${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
-            });
-            html += `</div>`;
-        });
-        historyList.innerHTML = html || "내역 없음";
-    }
-
-    // 모달 관련 함수들
-    function openMgmtModal() { document.getElementById('mgmtModal').style.display='block'; }
-    function closeMgmtModal() { document.getElementById('mgmtModal').style.display='none'; }
-    function openActionModal(mode) {
-        closeMgmtModal();
-        const select = document.getElementById('actionItemSelect');
-        select.innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-        document.getElementById('actionModal').style.display='block';
-        document.getElementById('qtyInputArea').style.display = mode === 'del' ? 'none' : 'block';
-        document.getElementById('deleteConfirmMsg').style.display = mode === 'del' ? 'block' : 'none';
-        document.getElementById('actionConfirmBtn').onclick = () => processAction(mode);
-    }
-    function closeActionModal() { document.getElementById('actionModal').style.display='none'; }
-    async function processAction(mode) {
-        const name = document.getElementById('actionItemSelect').value;
-        const qty = parseInt(document.getElementById('actionQty').value) || 0;
-        const idx = db_master.findIndex(i => i.name === name);
-        if(mode === 'in') db_master[idx].initial += qty;
-        else if(mode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; }
-        else if(mode === 'del') db_master.splice(idx, 1);
-        await saveToCloud();
-        closeActionModal();
     }
 
     async function addItem() {
