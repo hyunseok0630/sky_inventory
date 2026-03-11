@@ -208,7 +208,7 @@
             let applyCount = 0;
             rows.forEach(row => {
                 const title = row['상품명'] || row['등록상품명'] || row['주문상품명'];
-                const qty = parseInt(row['수량'] || row['구매수량']) || 1;
+                const qty = parseInt(row['수량'] || row['구매수량'] || row['구매수(수량)']) || 1;
                 if(title) {
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
@@ -306,3 +306,4 @@
 </script>
 </body>
 </html>
+
