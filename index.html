@@ -165,8 +165,8 @@
 </div>
 
 <script>
-    // ★★★ 중요: 새로 배포한 웹 앱 URL을 붙여넣으세요! ★★★
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
+    // 전달해주신 URL 적용 완료!
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
     
     let db_master = [], db_map = [], db_history = [];
 
@@ -204,11 +204,15 @@
 
     async function saveToCloud() {
         toggleLoading(true);
-        await fetch(G_SCRIPT_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
-        });
-        render();
+        try {
+            await fetch(G_SCRIPT_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
+            });
+            render();
+        } catch (e) {
+            addLog("구글 시트 저장 실패", "danger");
+        }
         toggleLoading(false);
     }
 
