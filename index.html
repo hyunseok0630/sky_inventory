@@ -534,36 +534,59 @@
         document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
     }
 
-    // ★ XLSX 파일(엑셀) 저장으로 완벽하게 업그레이드 된 로직
+    // ★ 품목별/판매처별 합산 피벗 테이블 형태의 엑셀 출력
     function exportMonthlySalesExcel() {
         const currentMonth = getCurrentMonth(); // 예: "2026-03"
         const monthlyData = db_history.filter(h => h.date.startsWith(currentMonth));
         if(monthlyData.length === 0) return alert("이번 달 판매 내역이 없습니다.");
 
-        // 데이터를 엑셀 친화적인 형태로 재구성
-        const excelData = monthlyData.map(row => ({
-            "날짜": row.date,
-            "품목명": row.name,
-            "수량": row.qty,
-            "판매처": row.source || "수기"
-        }));
+        // 1. 데이터 집계 (품목별 통계)
+        const summary = {};
+        const sources = new Set();
 
-        // SheetJS (XLSX) 워크북과 워크시트 생성
+        monthlyData.forEach(row => {
+            const name = row.name;
+            const qty = parseInt(row.qty) || 0;
+            const source = row.source || "수기";
+
+            if (!summary[name]) summary[name] = { "총 판매수량": 0 };
+            summary[name]["총 판매수량"] += qty;
+            
+            if (!summary[name][source]) summary[name][source] = 0;
+            summary[name][source] += qty;
+            
+            sources.add(source);
+        });
+
+        // 2. 판매처(쿠팡, 네이버, 수기 등) 목록을 가나다순 정렬하여 열로 만들기
+        const sourceArray = Array.from(sources).sort();
+
+        // 3. 엑셀에 입력할 최종 데이터 배열 생성
+        const excelData = Object.keys(summary).sort().map(name => {
+            const rowData = { "품목명": name, "총 판매수량": summary[name]["총 판매수량"] };
+            sourceArray.forEach(src => {
+                rowData[src] = summary[name][src] || 0; // 해당 판매처에서 팔린 수량 (없으면 0)
+            });
+            return rowData;
+        });
+
+        // SheetJS (XLSX) 워크북/워크시트 생성
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
 
-        // 컬럼 사이즈 조정 (글자가 안 잘리고 보기 좋도록)
-        ws['!cols'] = [
-            {wch: 12}, // 날짜
-            {wch: 30}, // 품목명
-            {wch: 8},  // 수량
-            {wch: 15}  // 판매처
+        // 4. 컬럼(열) 너비 넉넉하게 자동 맞춤
+        const wscols = [
+            {wch: 35}, // 첫번째 열(품목명)을 넓게
+            {wch: 12}  // 총 판매수량
         ];
+        // 동적으로 생겨난 판매처 수만큼 열 너비 추가
+        sourceArray.forEach(() => wscols.push({wch: 10})); 
+        ws['!cols'] = wscols;
 
-        XLSX.utils.book_append_sheet(wb, ws, "이번달 판매내역");
+        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약");
 
         // xlsx 포맷으로 다운로드 실행
-        XLSX.writeFile(wb, `SKY_판매내역_${currentMonth}.xlsx`);
+        XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 
     loadFromCloud();
