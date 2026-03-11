@@ -34,14 +34,14 @@
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
-        /* 2. 체크박스 정렬 완벽 고정 */
+        /* 체크박스 정렬 고정 */
         .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
         .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
         .chk-item:hover { background: #f8f9fa; }
         .chk-item span { font-size: 14px; flex: 1; text-align: left; }
         .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
         
-        /* 3. 판매 데이터 적용 높낮이 정렬 고정 */
+        /* 판매 데이터 적용 높낮이 정렬 고정 */
         .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
         .action-row > div { display: flex; width: 100%; }
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; box-sizing: border-box; }
@@ -53,11 +53,12 @@
         .mgmt-menu-btn:hover { background: var(--primary); color: white; }
         .modal-btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
 
+        /* 히스토리 리스트 스타일 */
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
-        .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
-        .history-row { display: flex; justify-content: space-between; padding: 3px 5px; border-bottom: 1px solid #f0f0f0; }
-        .source-tag { font-size: 10px; background: #ebedef; padding: 2px 5px; border-radius: 4px; color: #666; margin-right: 5px; }
+        .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
+        .history-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 5px; border-bottom: 1px solid #f0f0f0; }
+        .source-tag { font-size: 11px; background: #ebedef; padding: 3px 6px; border-radius: 4px; color: #555; }
     </style>
 </head>
 <body>
@@ -178,7 +179,7 @@
     let db_master = [];
     let db_map = [];
     let db_history = [];
-    let g_lastDate = ""; // 클라우드에 저장할 마지막 날짜
+    let g_lastDate = ""; 
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toISOString().slice(0, 10); }
@@ -193,10 +194,7 @@
             db_history = data.history || [];
             const today = getToday();
             
-            // 날짜 리셋 로직: 클라우드의 lastDate를 확인
             g_lastDate = data.lastDate;
-            
-            // 만약 lastDate가 없으면 히스토리 기반으로 추정, 아예 없으면 오늘로 세팅
             if (!g_lastDate) {
                 if (db_history.length > 0) {
                     const sortedHistory = [...db_history].sort((a,b) => b.date.localeCompare(a.date));
@@ -206,14 +204,13 @@
                 }
             }
 
-            // 접속한 오늘 날짜가 마지막 저장 날짜보다 미래라면 이월 처리!
             if (g_lastDate < today) {
                 db_master.forEach(item => {
-                    item.initial = item.initial - item.sold; // 현재고가 기초재고로 넘어감
-                    item.sold = 0; // 당일판매량 리셋
+                    item.initial = item.initial - item.sold; 
+                    item.sold = 0; 
                 });
-                g_lastDate = today; // 업데이트된 날짜 갱신
-                await saveToCloud(); // 리셋된 데이터 클라우드 저장
+                g_lastDate = today; 
+                await saveToCloud(); 
             }
 
             document.getElementById('currentDateDisp').innerText = today;
@@ -225,7 +222,6 @@
     async function saveToCloud() {
         toggleLoading(true);
         try {
-            // 저장 시 반드시 현재 날짜(g_lastDate)를 포함하여 저장
             await fetch(G_SCRIPT_URL, {
                 method: "POST",
                 body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: g_lastDate || getToday() })
@@ -235,7 +231,6 @@
         toggleLoading(false);
     }
 
-    // 모달 제어 함수들
     function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
     function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
 
@@ -316,8 +311,9 @@
         if(!file) return;
         const fileName = file.name;
         let source = "엑셀반영";
-        if(fileName.includes("DeliveryList")) source = "쿠팡";
-        else if(fileName.includes("스마트스토어")) source = "네이버";
+        if(fileName.includes("쿠팡")) source = "쿠팡";
+        else if(fileName.includes("네이버")) source = "네이버";
+        
         const reader = new FileReader();
         reader.onload = async function(e) {
             const data = new Uint8Array(e.target.result);
@@ -385,12 +381,40 @@
             checks.innerHTML += `<label class="chk-item" for="${chkId}"><span>${item.name}</span><input type="checkbox" class="chk" value="${item.name}" id="${chkId}"></label>`; 
         });
 
-        const grouped = db_history.reduce((acc, obj) => { acc[obj.date] = acc[obj.date] || []; acc[obj.date].push(obj); return acc; }, {});
+        // --- 히스토리 병합 로직 개편 ---
+        const grouped = db_history.reduce((acc, obj) => { 
+            acc[obj.date] = acc[obj.date] || {};
+            acc[obj.date][obj.name] = acc[obj.date][obj.name] || {};
+            // undefined 예외 처리
+            let src = (obj.source && obj.source !== 'undefined') ? obj.source : '기타/수기';
+            acc[obj.date][obj.name][src] = (acc[obj.date][obj.name][src] || 0) + obj.qty;
+            return acc; 
+        }, {});
+
         let historyHTML = "";
         Object.keys(grouped).sort().reverse().forEach(date => {
             historyHTML += `<div class="history-day"><div class="history-date">${date}</div>`;
-            grouped[date].forEach(item => { 
-                historyHTML += `<div class="history-row"><span><span class="source-tag">${item.source}</span>${item.name}</span><b>${item.qty}개</b></div>`; 
+            
+            Object.keys(grouped[date]).sort((a,b) => a.localeCompare(b, 'ko')).forEach(itemName => {
+                const sourceData = grouped[date][itemName];
+                let totalQty = 0;
+                let sourceTags = "";
+                
+                Object.keys(sourceData).forEach(src => {
+                    totalQty += sourceData[src];
+                    sourceTags += `<span class="source-tag">${src} ${sourceData[src]}</span>`;
+                });
+                
+                historyHTML += `
+                <div class="history-row">
+                    <span style="font-weight: 500; flex: 1;">${itemName}</span>
+                    <div style="text-align: right;">
+                        <div style="font-size: 14px; font-weight: bold; color: var(--secondary); margin-bottom: 4px;">총 ${totalQty}개</div>
+                        <div style="display: flex; gap: 4px; justify-content: flex-end; flex-wrap: wrap;">
+                            ${sourceTags}
+                        </div>
+                    </div>
+                </div>`;
             });
             historyHTML += `</div>`;
         });
@@ -410,4 +434,3 @@
 </script>
 </body>
 </html>
-
