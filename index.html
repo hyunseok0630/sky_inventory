@@ -45,7 +45,7 @@
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
         .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
         
-        /* 판매처 태그 색상 정의 (컴퓨존 추가) */
+        /* 판매처 태그 색상 정의 */
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
         .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
@@ -203,8 +203,6 @@
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzavQ6un_cwtUa59yxn5bWyjn9M1W0smDAt5uQal1UMi6L0YOQQi0DPWyZjxjcd0e4/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
-    
-    // 되돌리기를 위한 백업 데이터 변수
     let backup_state = null;
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
@@ -223,20 +221,15 @@
     const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
 
     function saveStateForUndo() {
-        backup_state = {
-            master: JSON.parse(JSON.stringify(db_master)),
-            history: JSON.parse(JSON.stringify(db_history))
-        };
+        backup_state = { master: JSON.parse(JSON.stringify(db_master)), history: JSON.parse(JSON.stringify(db_history)) };
         document.getElementById('undoBtn').disabled = false;
     }
 
     async function undoLastAction() {
         if (!backup_state) return;
-        
         toggleLoading(true);
         db_master = backup_state.master;
         db_history = backup_state.history;
-        
         backup_state = null;
         document.getElementById('undoBtn').disabled = true;
         
@@ -263,7 +256,6 @@
             const data = await resp.json();
             
             db_master = data.master || [];
-            
             db_map = (data.map || []).map(m => {
                 let t = m.targets || [];
                 if (typeof t === 'string') { try { t = JSON.parse(t); } catch(e) { t = t.split(','); } }
@@ -301,10 +293,8 @@
 
             if (needsSave) await saveToCloud();
             document.getElementById('currentDateDisp').innerText = today;
-            
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
-
             render();
         } catch (e) { addLog("데이터 연동 오류!", "danger"); }
         toggleLoading(false);
@@ -325,6 +315,7 @@
         toggleLoading(false);
     }
 
+    // ★ 업그레이드된 무적 엑셀 파서
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -344,37 +335,57 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const wb = XLSX.read(data, { type: 'array' });
-                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                const sheet = wb.Sheets[wb.SheetNames[0]];
+
+                // 헤더를 무시하고 무조건 2차원 배열(행/열)로 전체 데이터를 추출합니다.
+                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
                 
-                if (rows.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
+                if (rawData.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
 
                 let applyCount = 0;
                 let failNames = new Set();
                 let parsedRows = 0;
 
-                let titleKey = null;
-                let qtyKey = null;
+                let headerRowIdx = -1;
+                let titleColIdx = -1;
+                let qtyColIdx = -1;
 
-                for (let r of rows) {
-                    const keys = Object.keys(r);
-                    // ★ '제품명' 키워드 추가 (컴퓨존 제품명 인식용)
-                    if (!titleKey) titleKey = keys.find(k => String(k).replace(/\s/g,'').match(/상품명|옵션명|상품이름|주문상품|제품명/));
-                    if (!qtyKey) qtyKey = keys.find(k => String(k).replace(/\s/g,'').match(/수량|구매수/));
-                    if (titleKey) break; 
+                // 상위 20줄을 샅샅이 뒤져서 '제품명'과 '수량'이 쓰여진 정확한 기둥(Column) 인덱스를 찾습니다.
+                for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                    const row = rawData[i];
+                    for (let j = 0; j < row.length; j++) {
+                        const cellVal = String(row[j]).replace(/\s/g, '');
+                        // '컴퓨존제품명' 등 모든 단어 완벽 탐지
+                        if (cellVal.match(/상품명|옵션명|상품이름|주문상품|제품명/)) titleColIdx = j;
+                        if (cellVal.match(/수량|구매수/)) qtyColIdx = j;
+                    }
+                    // 찾았으면 그 줄이 헤더 줄입니다.
+                    if (titleColIdx !== -1) {
+                        headerRowIdx = i;
+                        break;
+                    }
                 }
 
-                if (!titleKey) { addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger"); fileInput.value = ""; return; }
+                if (titleColIdx === -1) {
+                    addLog(`❌ 엑셀에서 '상품명/제품명' 기둥을 찾지 못했습니다.`, "danger");
+                    fileInput.value = ""; return;
+                }
 
                 let snapshot_master = JSON.parse(JSON.stringify(db_master));
                 let snapshot_history = JSON.parse(JSON.stringify(db_history));
 
-                rows.forEach(row => {
-                    const rawTitle = row[titleKey];
-                    if(!rawTitle || String(rawTitle).trim() === "") return; 
+                // 헤더가 있던 줄의 '다음 줄'부터 데이터 추출 시작
+                for (let i = headerRowIdx + 1; i < rawData.length; i++) {
+                    const row = rawData[i];
+                    const rawTitle = row[titleColIdx];
+                    if(!rawTitle || String(rawTitle).trim() === "") continue; 
 
                     parsedRows++;
                     const title = String(rawTitle).trim(); 
-                    let qty = parseInt(String(row[qtyKey]||'1').replace(/[^0-9]/g, '')) || 1; 
+                    let qty = 1;
+                    if (qtyColIdx !== -1 && row[qtyColIdx]) {
+                        qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, '')) || 1;
+                    }
 
                     const rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title));
                     
@@ -382,7 +393,7 @@
                         let appliedToItem = false;
                         if(rule.targets && rule.targets.length > 0) {
                             rule.targets.forEach(tName => { 
-                                const item = db_master.find(i => cleanStr(i.name) === cleanStr(tName)); 
+                                const item = db_master.find(masterItem => cleanStr(masterItem.name) === cleanStr(tName)); 
                                 if(item) { 
                                     item.sold += qty; 
                                     addHistory(item.name, qty, source); 
@@ -393,7 +404,7 @@
                         }
                         if(!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${title} 👉 연결대상: ${rule.targets.join(', ')}`);
                     } else failNames.add(title); 
-                });
+                }
 
                 if(applyCount > 0) {
                     backup_state = { master: snapshot_master, history: snapshot_history };
@@ -404,7 +415,7 @@
                 } else {
                     db_master = snapshot_master;
                     db_history = snapshot_history;
-                    addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
+                    addLog(`반영 0건. 미매칭 내역을 확인해주세요. (읽은 줄수: ${parsedRows})`, "warning");
                 }
 
                 if(failNames.size > 0) {
