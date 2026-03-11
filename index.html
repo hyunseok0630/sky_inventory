@@ -132,6 +132,7 @@
                 <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기">
                 <div id="itemChecks" class="check-area"></div>
                 <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매치 저장</button>
+                <button class="btn" style="width:100%; background:#636e72; color:white; margin-top:8px;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
             </div>
 
             <div class="card">
@@ -165,6 +166,14 @@
     </div>
 </div>
 
+<div id="mapModal" class="modal-overlay">
+    <div class="modal-content" style="width:500px;">
+        <h3 style="width:100%; text-align:center; margin-top:0;">매칭 규칙 관리</h3>
+        <div id="mapList" style="max-height:300px; overflow-y:auto; margin-bottom:15px; font-size:13px;"></div>
+        <button class="btn" style="width:100%; background:#eee;" onclick="closeMapModal()">닫기</button>
+    </div>
+</div>
+
 <script>
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
     
@@ -187,9 +196,31 @@
         try {
             const resp = await fetch(G_SCRIPT_URL);
             const data = await resp.json();
+            
             db_master = data.master || [];
-            db_map = data.map || [];
-            db_history = data.history || [];
+            
+            // 🌟 1. 매칭(Map) 데이터 자동 복구 로직 (undefined 치료)
+            db_map = (data.map || []).map(m => {
+                let t = m.targets || [];
+                // 옛날 방식으로 저장된 텍스트 배열을 정상 배열로 파싱
+                if (typeof t === 'string') {
+                    try { t = JSON.parse(t); } catch(e) { t = t.split(','); }
+                }
+                if (!Array.isArray(t)) t = [t];
+                // 'undefined' 글자가 들어가 있으면 걸러버림
+                t = t.map(x => String(x).trim()).filter(x => x && x !== 'undefined' && x !== 'null');
+                return { exName: String(m.exName || '').trim(), targets: t };
+            }).filter(m => m.exName); // 연결 품목이 없어도 엑셀 이름이 있으면 일단 유지 (모달에서 지우게)
+
+            // 🌟 2. 히스토리(History) 날짜 오류 자동 복구 로직
+            db_history = (data.history || []).map(h => {
+                let d = h.date || getToday();
+                // 2026-03-10T15:00:00.000Z 같은 형태를 발견하면 한국 시간 YYYY-MM-DD로 복구
+                if (d.includes('T')) {
+                    d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
+                }
+                return { ...h, date: d, name: h.name || '알수없음' };
+            });
             
             const today = getToday();
             if (data.lastDate && data.lastDate < today) {
@@ -214,7 +245,6 @@
         toggleLoading(false);
     }
 
-    // 🌟 핵심: 규칙은 있지만 연결 품목이 없을 때도 잡아내도록 로직 수정
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -222,7 +252,6 @@
 
         let source = "기타";
         const fileName = file.name;
-        
         if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
 
@@ -235,10 +264,7 @@
                 const wb = XLSX.read(data, { type: 'array' });
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
                 
-                if (rows.length === 0) {
-                    addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
-                    return;
-                }
+                if (rows.length === 0) return addLog("엑셀 파일이 비어있습니다.", "danger");
 
                 let applyCount = 0;
                 let failNames = new Set();
@@ -267,7 +293,6 @@
                     parsedRows++;
                     const title = String(rawTitle).trim(); 
                     let qty = 1;
-                    
                     if(qtyKey && row[qtyKey]) {
                         qty = parseInt(String(row[qtyKey]).replace(/[^0-9]/g, '')) || 1; 
                     }
@@ -279,20 +304,11 @@
                         if(rule.targets && rule.targets.length > 0) {
                             rule.targets.forEach(tName => { 
                                 const item = db_master.find(i => i.name === tName); 
-                                if(item) { 
-                                    item.sold += qty; 
-                                    addHistory(tName, qty, source); 
-                                    applyCount++; 
-                                    appliedToItem = true;
-                                } 
+                                if(item) { item.sold += qty; addHistory(tName, qty, source); applyCount++; appliedToItem = true; } 
                             });
                         }
-                        // 매칭 규칙은 있는데 체크된 품목이 없거나, 품목이 삭제된 경우
-                        if(!appliedToItem) {
-                            failNames.add(title + " (체크된 품목 없음)");
-                        }
+                        if(!appliedToItem) failNames.add(title + " (연결품목 없음)");
                     } else {
-                        // 매칭 규칙 자체가 없는 경우
                         failNames.add(title);
                     }
                 });
@@ -301,7 +317,7 @@
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
                 } else {
-                    addLog(`반영 0건 (인식된 상품 ${parsedRows}개). 아래 로그를 확인해주세요.`, "warning");
+                    addLog(`반영 0건. 아래 로그를 확인해주세요.`, "warning");
                 }
 
                 if(failNames.size > 0) {
@@ -317,6 +333,8 @@
     }
 
     function addHistory(name, qty, source) {
+        // 이름이 undefined 같은 이상한 문자열로 들어오는 것을 방어
+        if (!name || name === 'undefined' || name === 'null') return;
         db_history.push({ date: getToday(), name: name, qty: qty, source: source });
     }
 
@@ -347,9 +365,11 @@
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
-            acc[obj.date][obj.name] = acc[obj.date][obj.name] || {};
+            // undefined 예외 방어
+            const safeName = obj.name === 'undefined' ? '알수없음(오류복구)' : obj.name;
+            acc[obj.date][safeName] = acc[obj.date][safeName] || {};
             let s = obj.source || '수기';
-            acc[obj.date][obj.name][s] = (acc[obj.date][obj.name][s] || 0) + obj.qty;
+            acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
             return acc; 
         }, {});
 
@@ -376,7 +396,31 @@
         `).join('');
     }
 
-    // 모달 관리
+    // --- 매칭 규칙 관리 모달 기능 (복구됨) ---
+    function openMapModal() {
+        const list = document.getElementById('mapList');
+        list.innerHTML = db_map.map((m, i) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:8px 0;">
+                <div style="flex:1; word-break:keep-all;">
+                    <b>${m.exName}</b> <br>
+                    <span style="color:var(--primary); font-weight:bold;">👉 ${m.targets.length > 0 ? m.targets.join(', ') : '<span style="color:red;">연결품목 없음(오류)</span>'}</span>
+                </div>
+                <button class="btn" style="background:var(--danger); color:white; padding:6px 10px;" onclick="deleteMap(${i})">삭제</button>
+            </div>
+        `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
+        document.getElementById('mapModal').style.display = 'block';
+    }
+    
+    function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
+    
+    async function deleteMap(idx) {
+        db_map.splice(idx, 1);
+        await saveToCloud();
+        addLog("매칭 규칙이 삭제되었습니다.", "success");
+        openMapModal(); // 모달 창 갱신
+    }
+
+    // --- 일반 모달 관리 ---
     function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
     function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
     let currentMode = '';
@@ -447,7 +491,7 @@
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
         if(!exName || targets.length === 0) {
-            alert("연결할 내부 품목을 체크해주세요!");
+            alert("연결할 내부 품목을 아래 체크박스에서 선택해주세요!");
             return;
         }
         db_map.push({ exName, targets });
