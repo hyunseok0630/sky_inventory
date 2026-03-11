@@ -36,8 +36,11 @@
         .log-danger { color: #ff7675; }
         .log-warning { color: #fdcb6e; }
         
-        .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
+        /* 히스토리 그리드 (판매/입고 반반) */
+        .history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
+        .history-day-in { border-left-color: var(--accent); }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
         .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
@@ -91,7 +94,7 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초</th><th>판매</th><th>현재고</th><th>매출액</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
@@ -113,9 +116,10 @@
             <div class="card">
                 <h3>3. 판매 데이터 적용</h3>
                 <div class="action-row">
-                    <select id="directItemSelect"></select>
-                    <input type="number" id="directQty" value="1" min="1">
-                    <button class="btn" style="background:var(--point); color:white;" onclick="applyDirectSale()">수기반영</button>
+                    <select id="directItemSelect" style="flex:2;"></select>
+                    <input type="number" id="directQty" value="1" min="1" style="flex:1;">
+                    <input type="text" id="directSource" value="수기" placeholder="판매처(예:당근)" style="flex:1.5;">
+                    <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
                 </div>
                 <div class="action-row">
                     <input type="file" id="exFile" accept=".xlsx, .xls">
@@ -136,8 +140,21 @@
             </div>
 
             <div class="card">
-                <h3>5. 전체 판매 히스토리</h3>
-                <div id="historyContainer" class="history-list"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
+                    <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySales()">이번달 판매내역 엑셀저장</button>
+                </div>
+                
+                <div class="history-grid">
+                    <div>
+                        <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
+                        <div id="historyContainer" class="history-list"></div>
+                    </div>
+                    <div>
+                        <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">📦 입고 내역</div>
+                        <div id="inHistoryContainer" class="history-list"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -147,7 +164,7 @@
     <div class="modal-content">
         <h3 style="width:100%; text-align:center;">품목 관리 메뉴</h3>
         <button class="mgmt-menu-btn" onclick="openActionModal('in')">📦 입고 수량 추가</button>
-        <button class="mgmt-menu-btn" onclick="openActionModal('edit')">✏️ 재고 수량 수정</button>
+        <button class="mgmt-menu-btn" onclick="openActionModal('edit')">✏️ 재고 수량 수정 (실사조정)</button>
         <button class="mgmt-menu-btn" onclick="openActionModal('del')">❌ 품목 삭제</button>
         <button class="btn" style="width:100%; margin-top:10px; background:#eee;" onclick="closeMgmtModal()">닫기</button>
     </div>
@@ -175,12 +192,13 @@
 </div>
 
 <script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzavQ6un_cwtUa59yxn5bWyjn9M1W0smDAt5uQal1UMi6L0YOQQi0DPWyZjxjcd0e4/exec";
     
-    let db_master = [], db_map = [], db_history = [];
+    let db_master = [], db_map = [], db_history = [], db_in_history = [];
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
+    function getCurrentMonth() { return getToday().substring(0, 7); }
 
     function addLog(msg, type='info') {
         const logArea = document.getElementById('actionLog');
@@ -191,7 +209,6 @@
         logArea.prepend(entry);
     }
 
-    // ★ 문자열의 모든 띄어쓰기 및 특수 괄호, 따옴표를 완전히 제거해버리는 철벽 함수
     const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
 
     async function loadFromCloud() {
@@ -204,11 +221,8 @@
             
             db_map = (data.map || []).map(m => {
                 let t = m.targets || [];
-                if (typeof t === 'string') {
-                    try { t = JSON.parse(t); } catch(e) { t = t.split(','); }
-                }
+                if (typeof t === 'string') { try { t = JSON.parse(t); } catch(e) { t = t.split(','); } }
                 if (!Array.isArray(t)) t = [t];
-                // 저장된 매칭 타겟의 더미 문자열도 안전하게 청소
                 t = t.map(x => String(x).replace(/[\[\]"]/g, '').trim()).filter(x => x && x !== 'undefined' && x !== 'null');
                 return { exName: String(m.exName || '').trim(), targets: t };
             }).filter(m => m.exName);
@@ -218,12 +232,31 @@
                 if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
                 return { ...h, date: d, name: h.name || '알수없음' };
             });
+
+            db_in_history = (data.inHistory || []).map(h => {
+                let d = h.date || getToday();
+                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
+                return { ...h, date: d };
+            });
             
             const today = getToday();
+            const currentMonth = getCurrentMonth();
+            let needsSave = false;
+
+            // 월 단위 입고량 초기화 체크
+            if (data.lastMonth && data.lastMonth < currentMonth) {
+                db_master.forEach(i => i.inQty = 0);
+                addLog(`새로운 달(${currentMonth})이 시작되어 입고량이 초기화되었습니다.`, "info");
+                needsSave = true;
+            }
+
+            // 일 단위 재고 이월 (기초 = 현재고, 판매 = 0)
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
-                await saveToCloud();
+                needsSave = true;
             }
+
+            if (needsSave) await saveToCloud();
             document.getElementById('currentDateDisp').innerText = today;
             render();
         } catch (e) { addLog("데이터 연동 오류!", "danger"); }
@@ -235,14 +268,16 @@
         try {
             await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
-                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
+                body: JSON.stringify({ 
+                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    lastDate: getToday(), lastMonth: getCurrentMonth() 
+                })
             });
             render();
         } catch (e) { addLog("구글 시트 저장 실패", "danger"); }
         toggleLoading(false);
     }
 
-    // 🌟 띄어쓰기 무시 매칭이 적용된 핵심 로직
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -278,10 +313,7 @@
                     if (titleKey) break; 
                 }
 
-                if (!titleKey) {
-                    addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger");
-                    fileInput.value = ""; return;
-                }
+                if (!titleKey) { addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger"); fileInput.value = ""; return; }
 
                 rows.forEach(row => {
                     const rawTitle = row[titleKey];
@@ -291,45 +323,35 @@
                     const title = String(rawTitle).trim(); 
                     let qty = parseInt(String(row[qtyKey]||'1').replace(/[^0-9]/g, '')) || 1; 
 
-                    // ★ 변경점: 엑셀 이름과 맵핑 이름의 '모든 띄어쓰기'를 지우고 순수 글자로만 비교합니다.
                     const rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title));
                     
                     if(rule) {
                         let appliedToItem = false;
                         if(rule.targets && rule.targets.length > 0) {
                             rule.targets.forEach(tName => { 
-                                // ★ 변경점: 내부 품목 이름과 체크박스로 지정했던 이름도 띄어쓰기를 무시하고 비교합니다.
                                 const item = db_master.find(i => cleanStr(i.name) === cleanStr(tName)); 
                                 if(item) { 
                                     item.sold += qty; 
-                                    addHistory(item.name, qty, source); // 원래 이름으로 예쁘게 저장
+                                    addHistory(item.name, qty, source); 
                                     applyCount++; 
                                     appliedToItem = true; 
                                 } 
                             });
                         }
-                        if(!appliedToItem) {
-                            // 찾았는데 마스터에 품목이 없다면, 어떤 대상을 찾으려다 실패했는지 친절하게 안내
-                            failNames.add(`[매칭됨, 품목없음] ${title} 👉 연결대상: ${rule.targets.join(', ')}`);
-                        }
-                    } else {
-                        failNames.add(title); // 규칙 자체가 없는 경우
-                    }
+                        if(!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${title} 👉 연결대상: ${rule.targets.join(', ')}`);
+                    } else failNames.add(title); 
                 });
 
                 if(applyCount > 0) {
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 완벽하게 반영되었습니다.`, "success");
-                } else {
-                    addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
-                }
+                } else addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
 
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
                     const displayFails = failArr.slice(0, 3).join(' | ');
                     addLog(`[오류 내역]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
-                
                 fileInput.value = "";
             } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); }
         };
@@ -347,7 +369,7 @@
         let dayTotalSales = 0; 
 
         table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => {
-            const currentStock = item.initial - item.sold;
+            const currentStock = item.initial - item.sold; // 초기(기초)+입고 반영상태에서 판매량만 뺌
             const salesAmount = item.sold * item.price;
             dayTotalSales += salesAmount; 
 
@@ -355,20 +377,22 @@
                 <tr>
                     <td style="text-align:left"><b>${item.name}</b></td>
                     <td>${item.price.toLocaleString()}</td>
-                    <td>${item.initial}</td>
+                    <td>${item.initial - (item.inQty||0)}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
                     <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
                     <td>${currentStock}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td>
+                    <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
             `;
         }).join('');
 
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
 
+        // 판매 히스토리 렌더링
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
-            const safeName = obj.name === 'undefined' ? '알수없음(오류복구)' : obj.name;
+            const safeName = obj.name === 'undefined' ? '알수없음' : obj.name;
             acc[obj.date][safeName] = acc[obj.date][safeName] || {};
             let s = obj.source || '수기';
             acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
@@ -382,30 +406,42 @@
                 let total = 0, tags = "";
                 Object.keys(grouped[date][name]).forEach(src => {
                     total += grouped[date][name][src];
-                    const cls = `tag-${src}`;
-                    tags += `<span class="source-tag ${cls}">${src} ${grouped[date][name][src]}</span> `;
+                    tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span> `;
                 });
-                hHtml += `<div class="history-row"><span style="flex:1;">${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
+                hHtml += `<div class="history-row"><span style="flex:1;">${name}</span><div style="text-align:right"><b>총 ${total}</b><br>${tags}</div></div>`;
             });
             hHtml += `</div>`;
         });
-        historyList.innerHTML = hHtml || "데이터 없음";
+        historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
+
+        // 입고 히스토리 렌더링
+        const inHistoryList = document.getElementById('inHistoryContainer');
+        const groupedIn = db_in_history.reduce((acc, obj) => { 
+            acc[obj.date] = acc[obj.date] || {};
+            acc[obj.date][obj.name] = (acc[obj.date][obj.name] || 0) + obj.qty;
+            return acc; 
+        }, {});
+
+        let inHtml = "";
+        Object.keys(groupedIn).sort().reverse().forEach(date => {
+            inHtml += `<div class="history-day history-day-in"><div class="history-date">${date}</div>`;
+            Object.keys(groupedIn[date]).forEach(name => {
+                inHtml += `<div class="history-row"><span style="flex:1;">${name}</span><b style="color:var(--accent);">+${groupedIn[date][name]}개</b></div>`;
+            });
+            inHtml += `</div>`;
+        });
+        inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
         document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         const sortedItems = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
-        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `
-            <label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>
-        `).join('');
+        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
     }
 
     function openMapModal() {
         const list = document.getElementById('mapList');
         list.innerHTML = db_map.map((m, i) => `
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:8px 0;">
-                <div style="flex:1; word-break:keep-all;">
-                    <b>${m.exName}</b> <br>
-                    <span style="color:var(--primary); font-weight:bold;">👉 ${m.targets.length > 0 ? m.targets.join(', ') : '<span style="color:red;">연결품목 없음(오류)</span>'}</span>
-                </div>
+                <div style="flex:1; word-break:keep-all;"><b>${m.exName}</b> <br><span style="color:var(--primary); font-weight:bold;">👉 ${m.targets.length > 0 ? m.targets.join(', ') : '<span style="color:red;">연결품목 없음(오류)</span>'}</span></div>
                 <button class="btn" style="background:var(--danger); color:white; padding:6px 10px;" onclick="deleteMap(${i})">삭제</button>
             </div>
         `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
@@ -415,7 +451,7 @@
     async function deleteMap(idx) {
         db_map.splice(idx, 1);
         await saveToCloud();
-        addLog("매칭 규칙이 삭제되었습니다.", "success");
+        addLog("매칭 규칙 삭제 완료", "success");
         openMapModal();
     }
 
@@ -434,7 +470,7 @@
         const confirmBtn = document.getElementById('actionConfirmBtn');
         if(mode === 'in') {
             document.getElementById('actionTitle').innerText = "📦 입고 수량 추가";
-            document.getElementById('qtyLabel').innerText = "추가할 수량";
+            document.getElementById('qtyLabel').innerText = "추가할 입고량";
             confirmBtn.innerText = "입고하기";
             confirmBtn.style.background = 'var(--primary)';
         } else if(mode === 'edit') {
@@ -451,14 +487,21 @@
         document.getElementById('actionModal').style.display = 'block';
     }
     function closeActionModal() { document.getElementById('actionModal').style.display = 'none'; }
+    
     async function processMgmtAction() {
         const itemName = document.getElementById('actionItemSelect').value;
         const qty = parseInt(document.getElementById('actionQty').value) || 0;
         const idx = db_master.findIndex(i => i.name === itemName);
         if(idx === -1) return;
-        if(currentMode === 'in') db_master[idx].initial += qty;
+
+        if(currentMode === 'in') {
+            db_master[idx].initial += qty;
+            db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
+            db_in_history.push({ date: getToday(), name: itemName, qty: qty });
+        }
         else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; }
         else if(currentMode === 'del') db_master.splice(idx, 1);
+        
         await saveToCloud();
         addLog(`관리 완료: ${itemName}`, "success");
         closeActionModal();
@@ -467,7 +510,7 @@
     async function addItem() {
         const name = document.getElementById('mName').value.trim();
         if(!name) return;
-        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
+        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0 });
         await saveToCloud();
         addLog(`신규 등록: ${name}`, "info");
         document.getElementById('mName').value = "";
@@ -476,24 +519,42 @@
     async function applyDirectSale() {
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
+        const source = document.getElementById('directSource').value.trim() || "수기";
+        
         const item = db_master.find(i => i.name === name);
-        if(item) { item.sold += qty; addHistory(name, qty, "수기"); await saveToCloud(); addLog(`수기 반영: ${name} ${qty}개`, "success"); }
+        if(item) { item.sold += qty; addHistory(name, qty, source); await saveToCloud(); addLog(`${source} 반영: ${name} ${qty}개`, "success"); }
     }
 
     async function addMap() {
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
-        if(!exName || targets.length === 0) {
-            alert("연결할 내부 품목을 아래 체크박스에서 선택해주세요!");
-            return;
-        }
+        if(!exName || targets.length === 0) { alert("연결할 내부 품목을 체크해주세요!"); return; }
         db_map.push({ exName, targets });
         await saveToCloud();
         addLog(`규칙 추가: ${exName}`, "info");
         document.getElementById('exName').value = "";
-        
-        // 추가 후 체크박스 초기화
         document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
+    }
+
+    // ★ 월별 판매내역 CSV 엑셀 다운로드 기능
+    function exportMonthlySales() {
+        const currentMonth = getCurrentMonth(); // 예: "2026-03"
+        const monthlyData = db_history.filter(h => h.date.startsWith(currentMonth));
+        if(monthlyData.length === 0) return alert("이번 달 판매 내역이 없습니다.");
+
+        let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+        csvContent += "날짜,품목명,수량,판매처\n";
+        monthlyData.forEach(row => {
+            csvContent += `${row.date},${row.name},${row.qty},${row.source||'수기'}\n`;
+        });
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `SKY_판매내역_${currentMonth}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     }
 
     loadFromCloud();
