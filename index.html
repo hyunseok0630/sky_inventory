@@ -44,13 +44,17 @@
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
         .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
+        
+        /* 판매처 태그 색상 정의 (컴퓨존 추가) */
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
+        .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
-        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
@@ -114,7 +118,11 @@
 
         <div class="right-panel">
             <div class="card">
-                <h3>3. 판매 데이터 적용</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <h3 style="margin:0; border:none;">3. 판매 데이터 적용</h3>
+                    <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>↩️ 방금 전 되돌리기</button>
+                </div>
+                
                 <div class="action-row">
                     <select id="directItemSelect" style="flex:2;"></select>
                     <input type="number" id="directQty" value="1" min="1" style="flex:1;">
@@ -192,9 +200,12 @@
 </div>
 
 <script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzavQ6un_cwtUa59yxn5bWyjn9M1W0smDAt5uQal1UMi6L0YOQQi0DPWyZjxjcd0e4/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
+    
+    // ★ 되돌리기를 위한 백업 데이터 변수
+    let backup_state = null;
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
@@ -210,6 +221,44 @@
     }
 
     const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
+
+    // ★ 직전 상태를 저장하는 함수
+    function saveStateForUndo() {
+        backup_state = {
+            master: JSON.parse(JSON.stringify(db_master)),
+            history: JSON.parse(JSON.stringify(db_history))
+        };
+        document.getElementById('undoBtn').disabled = false;
+    }
+
+    // ★ 실행 취소(되돌리기) 함수
+    async function undoLastAction() {
+        if (!backup_state) return;
+        
+        toggleLoading(true);
+        // 데이터 복구
+        db_master = backup_state.master;
+        db_history = backup_state.history;
+        
+        // 한번 사용하면 다시 사용할 수 없도록 초기화
+        backup_state = null;
+        document.getElementById('undoBtn').disabled = true;
+        
+        try {
+            await fetch(G_SCRIPT_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ 
+                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    lastDate: getToday(), lastMonth: getCurrentMonth() 
+                })
+            });
+            addLog("⚠️ 방금 전 작업이 취소(되돌리기) 되었습니다.", "warning");
+            render();
+        } catch (e) {
+            addLog("되돌리기 상태 저장에 실패했습니다.", "danger");
+        }
+        toggleLoading(false);
+    }
 
     async function loadFromCloud() {
         toggleLoading(true);
@@ -243,14 +292,12 @@
             const currentMonth = getCurrentMonth();
             let needsSave = false;
 
-            // 월 단위 입고량 초기화 체크
             if (data.lastMonth && data.lastMonth < currentMonth) {
                 db_master.forEach(i => i.inQty = 0);
                 addLog(`새로운 달(${currentMonth})이 시작되어 입고량이 초기화되었습니다.`, "info");
                 needsSave = true;
             }
 
-            // 일 단위 재고 이월 (기초 = 현재고, 판매 = 0)
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
                 needsSave = true;
@@ -258,6 +305,11 @@
 
             if (needsSave) await saveToCloud();
             document.getElementById('currentDateDisp').innerText = today;
+            
+            // 초기화 시 되돌리기 비활성화
+            backup_state = null;
+            document.getElementById('undoBtn').disabled = true;
+
             render();
         } catch (e) { addLog("데이터 연동 오류!", "danger"); }
         toggleLoading(false);
@@ -285,8 +337,11 @@
 
         let source = "기타";
         const fileName = file.name;
+        
+        // ★ 판매처 인식 규칙 (컴퓨존 추가)
         if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
+        else if(fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
 
         addLog(`파일 분석 시작: ${fileName} (${source})`);
 
@@ -314,6 +369,10 @@
                 }
 
                 if (!titleKey) { addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger"); fileInput.value = ""; return; }
+
+                // ★ 데이터 변경 전 임시 스냅샷 생성
+                let snapshot_master = JSON.parse(JSON.stringify(db_master));
+                let snapshot_history = JSON.parse(JSON.stringify(db_history));
 
                 rows.forEach(row => {
                     const rawTitle = row[titleKey];
@@ -343,9 +402,18 @@
                 });
 
                 if(applyCount > 0) {
+                    // ★ 반영 성공 시, 백업 상태를 스냅샷으로 확정짓고 클라우드 저장
+                    backup_state = { master: snapshot_master, history: snapshot_history };
+                    document.getElementById('undoBtn').disabled = false;
+                    
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 완벽하게 반영되었습니다.`, "success");
-                } else addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
+                } else {
+                    // 반영 건수가 0이면 원래대로 돌려놓음 (가짜 기록 방지)
+                    db_master = snapshot_master;
+                    db_history = snapshot_history;
+                    addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
+                }
 
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
@@ -520,7 +588,13 @@
         const source = document.getElementById('directSource').value.trim() || "수기";
         
         const item = db_master.find(i => i.name === name);
-        if(item) { item.sold += qty; addHistory(name, qty, source); await saveToCloud(); addLog(`${source} 반영: ${name} ${qty}개`, "success"); }
+        if(item) { 
+            saveStateForUndo(); // ★ 수기 반영 전 백업
+            item.sold += qty; 
+            addHistory(name, qty, source); 
+            await saveToCloud(); 
+            addLog(`${source} 반영: ${name} ${qty}개`, "success"); 
+        }
     }
 
     async function addMap() {
@@ -534,13 +608,11 @@
         document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
     }
 
-    // ★ 품목별/판매처별 합산 피벗 테이블 형태의 엑셀 출력
     function exportMonthlySalesExcel() {
-        const currentMonth = getCurrentMonth(); // 예: "2026-03"
+        const currentMonth = getCurrentMonth();
         const monthlyData = db_history.filter(h => h.date.startsWith(currentMonth));
         if(monthlyData.length === 0) return alert("이번 달 판매 내역이 없습니다.");
 
-        // 1. 데이터 집계 (품목별 통계)
         const summary = {};
         const sources = new Set();
 
@@ -558,34 +630,24 @@
             sources.add(source);
         });
 
-        // 2. 판매처(쿠팡, 네이버, 수기 등) 목록을 가나다순 정렬하여 열로 만들기
         const sourceArray = Array.from(sources).sort();
 
-        // 3. 엑셀에 입력할 최종 데이터 배열 생성
         const excelData = Object.keys(summary).sort().map(name => {
             const rowData = { "품목명": name, "총 판매수량": summary[name]["총 판매수량"] };
             sourceArray.forEach(src => {
-                rowData[src] = summary[name][src] || 0; // 해당 판매처에서 팔린 수량 (없으면 0)
+                rowData[src] = summary[name][src] || 0; 
             });
             return rowData;
         });
 
-        // SheetJS (XLSX) 워크북/워크시트 생성
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
 
-        // 4. 컬럼(열) 너비 넉넉하게 자동 맞춤
-        const wscols = [
-            {wch: 35}, // 첫번째 열(품목명)을 넓게
-            {wch: 12}  // 총 판매수량
-        ];
-        // 동적으로 생겨난 판매처 수만큼 열 너비 추가
+        const wscols = [{wch: 35}, {wch: 12}];
         sourceArray.forEach(() => wscols.push({wch: 10})); 
         ws['!cols'] = wscols;
 
         XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약");
-
-        // xlsx 포맷으로 다운로드 실행
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 
