@@ -17,28 +17,24 @@
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
-        /* 4. 실시간 현황 테이블 */
         table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; }
         th, td { border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
-        /* ✅ 2. 플랫폼 매칭 체크박스 디자인 원상 복구 (깔끔한 리스트) */
         .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
         .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
         .chk-item:hover { background: #f8f9fa; }
         .chk-item span { font-size: 14px; flex: 1; text-align: left; margin-right: 15px; word-break: keep-all; line-height: 1.4; }
         .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
 
-        /* 작업 로그 영역 */
         .log-area { margin-top: 15px; padding: 10px; background: #2d3436; color: #dfe6e9; border-radius: 6px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; line-height: 1.6; }
         .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
         
-        /* 5. 전체 판매 히스토리 스타일 */
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
@@ -49,7 +45,6 @@
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
-        /* 기타 UI 요소 */
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
@@ -170,7 +165,8 @@
 </div>
 
 <script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
+    // ★★★ 중요: 새로 배포한 웹 앱 URL을 붙여넣으세요! ★★★
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
     
     let db_master = [], db_map = [], db_history = [];
 
@@ -216,7 +212,6 @@
         toggleLoading(false);
     }
 
-    // ✅ 엑셀 분석 로직 강화 (0건 오류 해결)
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -238,32 +233,24 @@
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                 
                 let applyCount = 0;
-                let failNames = new Set(); // 매칭 실패한 상품명들 수집
+                let failNames = new Set();
 
                 rows.forEach(row => {
-                    // 쿠팡, 네이버, 11번가 등 다양한 엑셀 헤더명 모두 포괄
                     const rawTitle = row['등록상품명'] || row['상품명'] || row['노출상품명'] || row['주문상품명'] || row['옵션명'] || row['상품이름'];
-                    if(!rawTitle) return; // 상품명 칸이 비어있는 행은 패스
+                    if(!rawTitle) return;
 
-                    const title = String(rawTitle).trim(); // 양옆 공백 무조건 제거
-                    // 수량 컬럼도 쿠팡 특유의 이름 포함하여 검사
+                    const title = String(rawTitle).trim(); 
                     let rawQty = row['구매수(수량)'] || row['수량'] || row['구매수량'] || row['주문수량'];
                     const qty = parseInt(rawQty) || 1;
 
-                    // 매칭 규칙에서 찾기
                     const rule = db_map.find(m => m.exName.trim() === title);
                     
                     if(rule) {
                         rule.targets.forEach(tName => { 
                             const item = db_master.find(i => i.name === tName); 
-                            if(item) { 
-                                item.sold += qty; 
-                                addHistory(tName, qty, source); 
-                                applyCount++; 
-                            } 
+                            if(item) { item.sold += qty; addHistory(tName, qty, source); applyCount++; } 
                         });
                     } else {
-                        // 매칭 실패 시 로그에 띄우기 위해 저장
                         failNames.add(title);
                     }
                 });
@@ -272,20 +259,16 @@
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
                 } else {
-                    addLog("반영된 내역이 0건입니다. 아래 미매칭 상품을 복사하여 [매칭 규칙]을 추가해주세요.", "danger");
+                    addLog("반영된 내역이 0건입니다. 미매칭 상품을 확인해주세요.", "danger");
                 }
 
-                // 매칭 실패한 항목이 있다면 로그 창에 표시해 줌 (복사하기 쉽도록)
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
-                    const displayFails = failArr.slice(0, 3).join(', '); // 너무 많으면 3개만 표시
+                    const displayFails = failArr.slice(0, 3).join(', ');
                     addLog(`미매칭 상품 감지: [ ${displayFails}${failArr.length > 3 ? ' ...' : ''} ]`, "danger");
                 }
-
                 fileInput.value = "";
-            } catch (err) {
-                addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger");
-            }
+            } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); }
         };
         reader.readAsArrayBuffer(file);
     }
@@ -350,7 +333,7 @@
         `).join('');
     }
 
-    // 모달 제어
+    // 모달 관리
     function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
     function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
     let currentMode = '';
@@ -397,7 +380,7 @@
         else if(currentMode === 'del') db_master.splice(idx, 1);
         
         await saveToCloud();
-        addLog(`관리 작업 완료: ${itemName}`, "success");
+        addLog(`관리 완료: ${itemName}`, "success");
         closeActionModal();
     }
 
@@ -406,7 +389,7 @@
         if(!name) return;
         db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
         await saveToCloud();
-        addLog(`신규 품목 등록: ${name}`, "info");
+        addLog(`신규 등록: ${name}`, "info");
         document.getElementById('mName').value = "";
     }
 
@@ -414,7 +397,7 @@
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
         const item = db_master.find(i => i.name === name);
-        if(item) { item.sold += qty; addHistory(name, qty, "수기"); await saveToCloud(); addLog(`수기 반영 완료: ${name} ${qty}개`, "success"); }
+        if(item) { item.sold += qty; addHistory(name, qty, "수기"); await saveToCloud(); addLog(`수기 반영: ${name} ${qty}개`, "success"); }
     }
 
     async function addMap() {
@@ -423,7 +406,7 @@
         if(!exName || targets.length === 0) return;
         db_map.push({ exName, targets });
         await saveToCloud();
-        addLog(`새로운 매칭 규칙 추가됨: ${exName}`, "info");
+        addLog(`규칙 추가: ${exName}`, "info");
         document.getElementById('exName').value = "";
     }
 
