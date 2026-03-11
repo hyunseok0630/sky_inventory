@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce - Error Fixed & Log Enhanced</title>
+    <title>SKY Commerce - Smart Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
@@ -17,18 +17,28 @@
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
+        /* 4. 실시간 현황 테이블 */
         table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; }
         th, td { border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
+        /* ✅ 2. 플랫폼 매칭 체크박스 디자인 원상 복구 (깔끔한 리스트) */
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
+        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
+        .chk-item:hover { background: #f8f9fa; }
+        .chk-item span { font-size: 14px; flex: 1; text-align: left; margin-right: 15px; word-break: keep-all; line-height: 1.4; }
+        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
+
+        /* 작업 로그 영역 */
         .log-area { margin-top: 15px; padding: 10px; background: #2d3436; color: #dfe6e9; border-radius: 6px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; line-height: 1.6; }
         .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
-
+        
+        /* 5. 전체 판매 히스토리 스타일 */
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
@@ -39,22 +49,32 @@
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
+        /* 기타 UI 요소 */
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 5px; }
-        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
+        
+        .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
+        .search-box { position: relative; flex: 1; max-width: 300px; }
+        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); height: 40px; }
+        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 10px; font-size: 16px; }
+        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; padding: 0 20px; font-size: 14px; white-space: nowrap; }
+
+        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
+        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .mgmt-menu-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fa; cursor: pointer; font-weight: bold; text-align: left; transition: 0.2s; }
+        .mgmt-menu-btn:hover { background: var(--primary); color: white; }
     </style>
 </head>
 <body>
 
-<div id="loadingOverlay">☁️ 동기화 중...</div>
+<div id="loadingOverlay">☁️ 데이터를 동기화하고 있습니다...</div>
 
 <div class="container">
     <div class="backup-group">
-        <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">📅 날짜: <span id="currentDateDisp">-</span></div>
+        <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
         <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침</button>
         <button class="btn-backup" onclick="exportData()">💾 로컬 백업</button>
         <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 복구</button>
@@ -64,9 +84,14 @@
     <div class="main-layout">
         <div class="left-panel">
             <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; border:none;">4. 실시간 재고 및 매출 현황</h3>
-                    <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()" style="width:200px; margin:0;">
+                <div class="inventory-header">
+                    <h3 style="margin:0; border:none; padding:0;">4. 실시간 재고 및 매출 현황</h3>
+                    <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end;">
+                        <div class="search-box">
+                            <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
+                        </div>
+                        <button class="btn btn-top-mgmt" onclick="openMgmtModal()">⚙️ 품목 관리</button>
+                    </div>
                 </div>
                 <table>
                     <thead>
@@ -76,12 +101,13 @@
                 </table>
                 <div class="summary">당일 매출 합계: <br><span id="totalSales">0</span>원</div>
             </div>
+
             <div class="card">
                 <h3>1. 신규 품목 등록</h3>
                 <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
                     <input type="text" id="mName" placeholder="품목명">
-                    <input type="number" id="mPrice" value="0">
-                    <input type="number" id="mQty" value="0">
+                    <input type="number" id="mPrice" placeholder="단가" value="0">
+                    <input type="number" id="mQty" placeholder="기초재고" value="0">
                 </div>
                 <button class="btn btn-main" onclick="addItem()">품목 리스트 추가</button>
             </div>
@@ -99,6 +125,7 @@
                     <input type="file" id="exFile" accept=".xlsx, .xls">
                     <button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀반영</button>
                 </div>
+                
                 <div id="actionLog" class="log-area">
                     <div class="log-entry log-info">> 시스템 준비 완료.</div>
                 </div>
@@ -119,18 +146,43 @@
     </div>
 </div>
 
+<div id="mgmtModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 style="width:100%; text-align:center;">품목 관리 메뉴</h3>
+        <button class="mgmt-menu-btn" onclick="openActionModal('in')">📦 입고 수량 추가</button>
+        <button class="mgmt-menu-btn" onclick="openActionModal('edit')">✏️ 재고 수량 수정</button>
+        <button class="mgmt-menu-btn" onclick="openActionModal('del')">❌ 품목 삭제</button>
+        <button class="btn" style="width:100%; margin-top:10px; background:#eee;" onclick="closeMgmtModal()">닫기</button>
+    </div>
+</div>
+
+<div id="actionModal" class="modal-overlay">
+    <div class="modal-content">
+        <h3 id="actionTitle" style="width:100%;">관리 작업</h3>
+        <select id="actionItemSelect"></select>
+        <div id="qtyInputArea"><label id="qtyLabel">수량</label><input type="number" id="actionQty" value="0"></div>
+        <div id="deleteConfirmMsg" style="display:none; color:var(--danger); font-weight:bold; margin-bottom:15px;">정말로 이 품목을 삭제하시겠습니까?</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px;">
+            <button class="btn" style="background:#eee;" onclick="closeActionModal()">취소</button>
+            <button id="actionConfirmBtn" class="btn btn-main">확인</button>
+        </div>
+    </div>
+</div>
+
 <script>
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
+    
     let db_master = [], db_map = [], db_history = [];
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
-    function getToday() { return new Date().toISOString().slice(0, 10); }
+    function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
 
     function addLog(msg, type='info') {
         const logArea = document.getElementById('actionLog');
+        const now = new Date().toLocaleTimeString();
         const entry = document.createElement('div');
         entry.className = `log-entry log-${type}`;
-        entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        entry.innerText = `[${now}] ${msg}`;
         logArea.prepend(entry);
     }
 
@@ -142,6 +194,7 @@
             db_master = data.master || [];
             db_map = data.map || [];
             db_history = data.history || [];
+            
             const today = getToday();
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
@@ -149,23 +202,21 @@
             }
             document.getElementById('currentDateDisp').innerText = today;
             render();
-        } catch (e) { addLog("데이터 연동 실패", "danger"); }
+        } catch (e) { addLog("데이터 연동 오류!", "danger"); }
         toggleLoading(false);
     }
 
     async function saveToCloud() {
         toggleLoading(true);
-        try {
-            await fetch(G_SCRIPT_URL, { 
-                method: "POST", 
-                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
-            });
-            render();
-        } catch(e) { addLog("클라우드 저장 실패", "danger"); }
+        await fetch(G_SCRIPT_URL, { 
+            method: "POST", 
+            body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
+        });
+        render();
         toggleLoading(false);
     }
 
-    // 엑셀 로드 및 매칭 로직 (오류 수정됨)
+    // ✅ 엑셀 분석 로직 강화 (0건 오류 해결)
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -173,10 +224,11 @@
 
         let source = "기타";
         const fileName = file.name;
+        
         if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
 
-        addLog(`파일 읽기: ${fileName} (${source})`);
+        addLog(`파일 분석 시작: ${fileName} (${source})`);
 
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -186,19 +238,21 @@
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                 
                 let applyCount = 0;
-                let failNames = new Set();
+                let failNames = new Set(); // 매칭 실패한 상품명들 수집
 
                 rows.forEach(row => {
-                    // 다양한 엑셀 헤더 대응 (상품명, 등록상품명, 주문상품명)
-                    const rawTitle = row['상품명'] || row['등록상품명'] || row['주문상품명'];
-                    if(!rawTitle) return;
+                    // 쿠팡, 네이버, 11번가 등 다양한 엑셀 헤더명 모두 포괄
+                    const rawTitle = row['등록상품명'] || row['상품명'] || row['노출상품명'] || row['주문상품명'] || row['옵션명'] || row['상품이름'];
+                    if(!rawTitle) return; // 상품명 칸이 비어있는 행은 패스
 
-                    const title = rawTitle.toString().trim(); // 공백 제거
-                    const qty = parseInt(row['수량'] || row['구매수량'] || row['구매수(수량)'] || 1);
+                    const title = String(rawTitle).trim(); // 양옆 공백 무조건 제거
+                    // 수량 컬럼도 쿠팡 특유의 이름 포함하여 검사
+                    let rawQty = row['구매수(수량)'] || row['수량'] || row['구매수량'] || row['주문수량'];
+                    const qty = parseInt(rawQty) || 1;
 
-                    // 매칭 규칙 찾기 (트리밍 적용)
+                    // 매칭 규칙에서 찾기
                     const rule = db_map.find(m => m.exName.trim() === title);
-
+                    
                     if(rule) {
                         rule.targets.forEach(tName => { 
                             const item = db_master.find(i => i.name === tName); 
@@ -209,43 +263,57 @@
                             } 
                         });
                     } else {
-                        failNames.add(title); // 매칭 실패한 이름 보관
+                        // 매칭 실패 시 로그에 띄우기 위해 저장
+                        failNames.add(title);
                     }
                 });
 
                 if(applyCount > 0) {
                     await saveToCloud();
-                    addLog(`${applyCount}건 반영 성공!`, "success");
+                    addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
                 } else {
-                    addLog("반영된 데이터가 없습니다. 매칭 설정을 확인하세요.", "danger");
+                    addLog("반영된 내역이 0건입니다. 아래 미매칭 상품을 복사하여 [매칭 규칙]을 추가해주세요.", "danger");
                 }
 
+                // 매칭 실패한 항목이 있다면 로그 창에 표시해 줌 (복사하기 쉽도록)
                 if(failNames.size > 0) {
-                    addLog(`미매칭 상품 존재: ${Array.from(failNames).slice(0,2).join(', ')} 등...`, "info");
+                    const failArr = Array.from(failNames);
+                    const displayFails = failArr.slice(0, 3).join(', '); // 너무 많으면 3개만 표시
+                    addLog(`미매칭 상품 감지: [ ${displayFails}${failArr.length > 3 ? ' ...' : ''} ]`, "danger");
                 }
 
+                fileInput.value = "";
             } catch (err) {
-                addLog("엑셀 처리 중 오류 발생", "danger");
+                addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger");
             }
-            fileInput.value = "";
         };
         reader.readAsArrayBuffer(file);
     }
 
     function addHistory(name, qty, source) {
-        db_history.push({ date: getToday(), name, qty, source });
+        db_history.push({ date: getToday(), name: name, qty: qty, source: source });
     }
 
     function render() {
         const table = document.getElementById('mainTable');
         const search = document.getElementById('inventorySearch').value.toLowerCase();
-        let dayTotalSales = 0;
+        let dayTotalSales = 0; 
 
         table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => {
             const currentStock = item.initial - item.sold;
             const salesAmount = item.sold * item.price;
-            dayTotalSales += salesAmount;
-            return `<tr><td style="text-align:left"><b>${item.name}</b></td><td>${item.price.toLocaleString()}</td><td>${item.initial}</td><td style="color:var(--point); font-weight:bold;">${item.sold}</td><td>${currentStock}</td><td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td></tr>`;
+            dayTotalSales += salesAmount; 
+
+            return `
+                <tr>
+                    <td style="text-align:left"><b>${item.name}</b></td>
+                    <td>${item.price.toLocaleString()}</td>
+                    <td>${item.initial}</td>
+                    <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
+                    <td>${currentStock}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td>
+                </tr>
+            `;
         }).join('');
 
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
@@ -266,9 +334,10 @@
                 let total = 0, tags = "";
                 Object.keys(grouped[date][name]).forEach(src => {
                     total += grouped[date][name][src];
-                    tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span> `;
+                    const cls = `tag-${src}`;
+                    tags += `<span class="source-tag ${cls}">${src} ${grouped[date][name][src]}</span> `;
                 });
-                hHtml += `<div class="history-row"><span>${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
+                hHtml += `<div class="history-row"><span style="flex:1;">${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
             });
             hHtml += `</div>`;
         });
@@ -276,7 +345,60 @@
 
         document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         const sortedItems = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
-        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
+        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `
+            <label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>
+        `).join('');
+    }
+
+    // 모달 제어
+    function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
+    function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
+    let currentMode = '';
+    function openActionModal(mode) {
+        currentMode = mode;
+        closeMgmtModal();
+        const select = document.getElementById('actionItemSelect');
+        const sorted = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
+        select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+        
+        document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
+        document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
+        document.getElementById('actionQty').value = 0;
+        
+        const confirmBtn = document.getElementById('actionConfirmBtn');
+        if(mode === 'in') {
+            document.getElementById('actionTitle').innerText = "📦 입고 수량 추가";
+            document.getElementById('qtyLabel').innerText = "추가할 수량";
+            confirmBtn.innerText = "입고하기";
+            confirmBtn.style.background = 'var(--primary)';
+        } else if(mode === 'edit') {
+            document.getElementById('actionTitle').innerText = "✏️ 재고 수량 수정";
+            document.getElementById('qtyLabel').innerText = "수정할 실재고";
+            confirmBtn.innerText = "수정하기";
+            confirmBtn.style.background = 'var(--primary)';
+        } else {
+            document.getElementById('actionTitle').innerText = "❌ 품목 삭제";
+            confirmBtn.innerText = "삭제하기";
+            confirmBtn.style.background = 'var(--danger)';
+        }
+        
+        confirmBtn.onclick = processMgmtAction;
+        document.getElementById('actionModal').style.display = 'block';
+    }
+    function closeActionModal() { document.getElementById('actionModal').style.display = 'none'; }
+    async function processMgmtAction() {
+        const itemName = document.getElementById('actionItemSelect').value;
+        const qty = parseInt(document.getElementById('actionQty').value) || 0;
+        const idx = db_master.findIndex(i => i.name === itemName);
+        if(idx === -1) return;
+
+        if(currentMode === 'in') db_master[idx].initial += qty;
+        else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; }
+        else if(currentMode === 'del') db_master.splice(idx, 1);
+        
+        await saveToCloud();
+        addLog(`관리 작업 완료: ${itemName}`, "success");
+        closeActionModal();
     }
 
     async function addItem() {
@@ -284,7 +406,7 @@
         if(!name) return;
         db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
         await saveToCloud();
-        addLog(`품목 추가: ${name}`);
+        addLog(`신규 품목 등록: ${name}`, "info");
         document.getElementById('mName').value = "";
     }
 
@@ -292,12 +414,7 @@
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
         const item = db_master.find(i => i.name === name);
-        if(item) { 
-            item.sold += qty; 
-            addHistory(name, qty, "수기"); 
-            await saveToCloud(); 
-            addLog(`수기 반영: ${name} ${qty}개`, "success");
-        }
+        if(item) { item.sold += qty; addHistory(name, qty, "수기"); await saveToCloud(); addLog(`수기 반영 완료: ${name} ${qty}개`, "success"); }
     }
 
     async function addMap() {
@@ -306,7 +423,7 @@
         if(!exName || targets.length === 0) return;
         db_map.push({ exName, targets });
         await saveToCloud();
-        addLog(`매칭 저장: ${exName}`);
+        addLog(`새로운 매칭 규칙 추가됨: ${exName}`, "info");
         document.getElementById('exName').value = "";
     }
 
