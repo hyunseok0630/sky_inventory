@@ -220,16 +220,26 @@
 
     const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
 
+    // ★ 백업 함수에 입고내역(inHistory)과 매칭규칙(map)까지 완벽하게 포함
     function saveStateForUndo() {
-        backup_state = { master: JSON.parse(JSON.stringify(db_master)), history: JSON.parse(JSON.stringify(db_history)) };
+        backup_state = { 
+            master: JSON.parse(JSON.stringify(db_master)), 
+            history: JSON.parse(JSON.stringify(db_history)),
+            inHistory: JSON.parse(JSON.stringify(db_in_history)),
+            map: JSON.parse(JSON.stringify(db_map))
+        };
         document.getElementById('undoBtn').disabled = false;
     }
 
+    // ★ 되돌리기 실행 시 누락 없이 전체 데이터 복구
     async function undoLastAction() {
         if (!backup_state) return;
         toggleLoading(true);
         db_master = backup_state.master;
         db_history = backup_state.history;
+        db_in_history = backup_state.inHistory;
+        db_map = backup_state.map;
+        
         backup_state = null;
         document.getElementById('undoBtn').disabled = true;
         
@@ -241,7 +251,7 @@
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
-            addLog("⚠️ 방금 전 작업이 취소(되돌리기) 되었습니다.", "warning");
+            addLog("⚠️ 방금 전 1건의 작업이 정확히 취소(되돌리기) 되었습니다.", "warning");
             render();
         } catch (e) {
             addLog("되돌리기 상태 저장에 실패했습니다.", "danger");
@@ -315,7 +325,6 @@
         toggleLoading(false);
     }
 
-    // ★ 업그레이드된 무적 엑셀 파서
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -337,9 +346,7 @@
                 const wb = XLSX.read(data, { type: 'array' });
                 const sheet = wb.Sheets[wb.SheetNames[0]];
 
-                // 헤더를 무시하고 무조건 2차원 배열(행/열)로 전체 데이터를 추출합니다.
                 const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-                
                 if (rawData.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
 
                 let applyCount = 0;
@@ -350,20 +357,14 @@
                 let titleColIdx = -1;
                 let qtyColIdx = -1;
 
-                // 상위 20줄을 샅샅이 뒤져서 '제품명'과 '수량'이 쓰여진 정확한 기둥(Column) 인덱스를 찾습니다.
                 for (let i = 0; i < Math.min(20, rawData.length); i++) {
                     const row = rawData[i];
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j]).replace(/\s/g, '');
-                        // '컴퓨존제품명' 등 모든 단어 완벽 탐지
                         if (cellVal.match(/상품명|옵션명|상품이름|주문상품|제품명/)) titleColIdx = j;
                         if (cellVal.match(/수량|구매수/)) qtyColIdx = j;
                     }
-                    // 찾았으면 그 줄이 헤더 줄입니다.
-                    if (titleColIdx !== -1) {
-                        headerRowIdx = i;
-                        break;
-                    }
+                    if (titleColIdx !== -1) { headerRowIdx = i; break; }
                 }
 
                 if (titleColIdx === -1) {
@@ -371,10 +372,12 @@
                     fileInput.value = ""; return;
                 }
 
+                // ★ 엑셀 업로드 직전의 전체 스냅샷 저장
                 let snapshot_master = JSON.parse(JSON.stringify(db_master));
                 let snapshot_history = JSON.parse(JSON.stringify(db_history));
+                let snapshot_in_history = JSON.parse(JSON.stringify(db_in_history));
+                let snapshot_map = JSON.parse(JSON.stringify(db_map));
 
-                // 헤더가 있던 줄의 '다음 줄'부터 데이터 추출 시작
                 for (let i = headerRowIdx + 1; i < rawData.length; i++) {
                     const row = rawData[i];
                     const rawTitle = row[titleColIdx];
@@ -407,7 +410,13 @@
                 }
 
                 if(applyCount > 0) {
-                    backup_state = { master: snapshot_master, history: snapshot_history };
+                    // ★ 엑셀 데이터 반영 후, 스냅샷을 백업본으로 저장
+                    backup_state = { 
+                        master: snapshot_master, 
+                        history: snapshot_history,
+                        inHistory: snapshot_in_history,
+                        map: snapshot_map
+                    };
                     document.getElementById('undoBtn').disabled = false;
                     
                     await saveToCloud();
@@ -415,6 +424,8 @@
                 } else {
                     db_master = snapshot_master;
                     db_history = snapshot_history;
+                    db_in_history = snapshot_in_history;
+                    db_map = snapshot_map;
                     addLog(`반영 0건. 미매칭 내역을 확인해주세요. (읽은 줄수: ${parsedRows})`, "warning");
                 }
 
@@ -516,17 +527,20 @@
         `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
         document.getElementById('mapModal').style.display = 'block';
     }
-    function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
+    
     async function deleteMap(idx) {
+        saveStateForUndo(); // ★ 매칭 규칙 삭제 전에도 1건 백업 생성
         db_map.splice(idx, 1);
         await saveToCloud();
         addLog("매칭 규칙 삭제 완료", "success");
         openMapModal();
     }
 
+    function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
     function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
     function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
     let currentMode = '';
+    
     function openActionModal(mode) {
         currentMode = mode;
         closeMgmtModal();
@@ -563,6 +577,8 @@
         const idx = db_master.findIndex(i => i.name === itemName);
         if(idx === -1) return;
 
+        saveStateForUndo(); // ★ 관리 작업(입고, 수정, 삭제) 직전 1건 백업 생성
+
         if(currentMode === 'in') {
             db_master[idx].initial += qty;
             db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
@@ -579,6 +595,9 @@
     async function addItem() {
         const name = document.getElementById('mName').value.trim();
         if(!name) return;
+        
+        saveStateForUndo(); // ★ 품목 추가 직전 1건 백업 생성
+
         db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0 });
         await saveToCloud();
         addLog(`신규 등록: ${name}`, "info");
@@ -592,7 +611,7 @@
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
-            saveStateForUndo(); 
+            saveStateForUndo(); // ★ 수기 반영 직전 1건 백업 생성
             item.sold += qty; 
             addHistory(name, qty, source); 
             await saveToCloud(); 
@@ -604,6 +623,9 @@
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
         if(!exName || targets.length === 0) { alert("연결할 내부 품목을 체크해주세요!"); return; }
+        
+        saveStateForUndo(); // ★ 매칭 규칙 추가 직전 1건 백업 생성
+        
         db_map.push({ exName, targets });
         await saveToCloud();
         addLog(`규칙 추가: ${exName}`, "info");
