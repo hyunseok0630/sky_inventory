@@ -165,7 +165,7 @@
 </div>
 
 <script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxw87OSxvefwe6LezcbunmMjQn2Up9VkMiQ5jcK6UhzKSOUJQYhukC8In_AhI8Yf6S0/exec";
     
     let db_master = [], db_map = [], db_history = [];
 
@@ -209,13 +209,11 @@
                 body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
             });
             render();
-        } catch (e) {
-            addLog("구글 시트 저장 실패", "danger");
-        }
+        } catch (e) { addLog("구글 시트 저장 실패", "danger"); }
         toggleLoading(false);
     }
 
-    // 🌟 핵심: 어떤 양식의 엑셀이든 상품명/수량을 유연하게 찾아내는 로직
+    // ★★★ 완전히 새로워진 스마트 엑셀 인식 엔진 ★★★
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -234,10 +232,11 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const wb = XLSX.read(data, { type: 'array' });
-                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                // 엑셀의 모든 데이터를 빈칸 포함하여 배열로 변환
+                const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
                 
                 if (rows.length === 0) {
-                    addLog("엑셀 파일에 데이터가 없거나 읽을 수 없는 형식입니다.", "danger");
+                    addLog("엑셀 파일이 비어있거나 읽을 수 없는 형식입니다.", "danger");
                     return;
                 }
 
@@ -245,22 +244,41 @@
                 let failNames = new Set();
                 let parsedRows = 0;
 
-                rows.forEach(row => {
-                    const keys = Object.keys(row);
-                    // 열 제목에 공백이나 특수문자가 있어도 포함 단어로 찾아냅니다.
-                    const titleKey = keys.find(k => String(k).replace(/\s/g,'').match(/상품명|옵션명|상품이름|주문상품/));
-                    const qtyKey = keys.find(k => String(k).replace(/\s/g,'').match(/수량|구매수/));
+                // 1. 유연한 열(컬럼) 이름 자동 탐지
+                let titleKey = null;
+                let qtyKey = null;
 
-                    if(!titleKey) return; // 상품명 정보가 없는 줄은 건너뜀
+                for (let r of rows) {
+                    const keys = Object.keys(r);
+                    // 띄어쓰기를 모두 없앤 후 키워드가 포함되어 있는지 확인
+                    if (!titleKey) titleKey = keys.find(k => String(k).replace(/\s/g,'').match(/상품명|옵션명|상품이름|주문상품/));
+                    if (!qtyKey) qtyKey = keys.find(k => String(k).replace(/\s/g,'').match(/수량|구매수/));
+                    if (titleKey) break; 
+                }
+
+                // 상품명 열을 끝내 찾지 못했을 경우의 디버그 로그
+                if (!titleKey) {
+                    const sampleKeys = Object.keys(rows[0]||{}).join(', ');
+                    addLog(`❌ 상품명 항목을 찾지 못했습니다. 엑셀 제목란: [${sampleKeys}]`, "danger");
+                    fileInput.value = "";
+                    return;
+                }
+
+                // 2. 데이터 추출 및 매칭
+                rows.forEach(row => {
+                    const rawTitle = row[titleKey];
+                    if(!rawTitle || String(rawTitle).trim() === "") return; // 빈 칸 건너뛰기
 
                     parsedRows++;
-                    const rawTitle = row[titleKey];
                     const title = String(rawTitle).trim(); 
                     let qty = 1;
-                    if(qtyKey) {
-                        qty = parseInt(row[qtyKey]) || 1;
+                    
+                    if(qtyKey && row[qtyKey]) {
+                        // "2개" 등 텍스트가 섞여 있어도 숫자만 추출
+                        qty = parseInt(String(row[qtyKey]).replace(/[^0-9]/g, '')) || 1; 
                     }
 
+                    // 매칭 규칙 비교 (양끝 공백 무시)
                     const rule = db_map.find(m => m.exName.trim() === title);
                     
                     if(rule) {
@@ -273,24 +291,20 @@
                     }
                 });
 
-                if (parsedRows === 0) {
-                    addLog("엑셀에서 '상품명' 항목을 찾지 못했습니다. 엑셀 양식을 확인해주세요.", "danger");
-                    fileInput.value = "";
-                    return;
-                }
-
                 if(applyCount > 0) {
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
                 } else {
-                    addLog("반영된 내역이 0건입니다. 미매칭 상품을 복사하여 추가해 주세요.", "danger");
+                    addLog(`반영 0건 (인식된 상품 ${parsedRows}개). 아래 미매칭 상품을 추가해 주세요.`, "danger");
                 }
 
+                // 매칭 실패 항목 상세 노출
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
                     const displayFails = failArr.slice(0, 3).join(', ');
-                    addLog(`미매칭 상품 감지: [ ${displayFails}${failArr.length > 3 ? ' ...' : ''} ]`, "danger");
+                    addLog(`[미매칭 상품]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
+                
                 fileInput.value = "";
             } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); }
         };
