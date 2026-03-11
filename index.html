@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce - Top Management UI</title>
+    <title>SKY Commerce - Unified Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
@@ -33,9 +33,19 @@
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
-        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
         
+        /* 2. 체크박스 정렬 완벽 고정 */
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
+        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
+        .chk-item:hover { background: #f8f9fa; }
+        .chk-item span { font-size: 14px; flex: 1; text-align: left; }
+        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
+        
+        /* 3. 판매 데이터 적용 높낮이 정렬 고정 */
+        .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        .action-row > div { display: flex; width: 100%; }
+        .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; box-sizing: border-box; }
+
         /* 모달 스타일 */
         .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
@@ -48,7 +58,6 @@
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 4px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; padding: 3px 5px; border-bottom: 1px solid #f0f0f0; }
         .source-tag { font-size: 10px; background: #ebedef; padding: 2px 5px; border-radius: 4px; color: #666; margin-right: 5px; }
-        .split-box { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 15px; }
     </style>
 </head>
 <body>
@@ -102,14 +111,14 @@
         <div class="right-panel">
             <div class="card">
                 <h3>3. 판매 데이터 적용</h3>
-                <div class="split-box">
+                <div class="action-row">
                     <div style="flex: 2;"><select id="directItemSelect"></select></div>
                     <div style="flex: 1;"><input type="number" id="directQty" value="1" min="1"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--point); color:white; width:100%; height:40px;" onclick="applyDirectSale()">즉시 반영</button></div>
+                    <div style="flex: 1.5;"><button class="btn" style="background:var(--point); color:white;" onclick="applyDirectSale()">즉시 반영</button></div>
                 </div>
-                <div style="display: flex; gap: 10px; align-items: flex-end;">
+                <div class="action-row">
                     <div style="flex: 3;"><input type="file" id="exFile" accept=".xlsx, .xls"></div>
-                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white; width:100%; height:40px;" onclick="loadExcel()">엑셀 반영</button></div>
+                    <div style="flex: 1.5;"><button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀 반영</button></div>
                 </div>
             </div>
 
@@ -169,6 +178,7 @@
     let db_master = [];
     let db_map = [];
     let db_history = [];
+    let g_lastDate = ""; // 클라우드에 저장할 마지막 날짜
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toISOString().slice(0, 10); }
@@ -181,7 +191,32 @@
             db_master = data.master || [];
             db_map = data.map || [];
             db_history = data.history || [];
-            document.getElementById('currentDateDisp').innerText = getToday();
+            const today = getToday();
+            
+            // 날짜 리셋 로직: 클라우드의 lastDate를 확인
+            g_lastDate = data.lastDate;
+            
+            // 만약 lastDate가 없으면 히스토리 기반으로 추정, 아예 없으면 오늘로 세팅
+            if (!g_lastDate) {
+                if (db_history.length > 0) {
+                    const sortedHistory = [...db_history].sort((a,b) => b.date.localeCompare(a.date));
+                    g_lastDate = sortedHistory[0].date;
+                } else {
+                    g_lastDate = today;
+                }
+            }
+
+            // 접속한 오늘 날짜가 마지막 저장 날짜보다 미래라면 이월 처리!
+            if (g_lastDate < today) {
+                db_master.forEach(item => {
+                    item.initial = item.initial - item.sold; // 현재고가 기초재고로 넘어감
+                    item.sold = 0; // 당일판매량 리셋
+                });
+                g_lastDate = today; // 업데이트된 날짜 갱신
+                await saveToCloud(); // 리셋된 데이터 클라우드 저장
+            }
+
+            document.getElementById('currentDateDisp').innerText = today;
             render();
         } catch (e) { alert("데이터 로딩 실패!"); }
         toggleLoading(false);
@@ -190,9 +225,10 @@
     async function saveToCloud() {
         toggleLoading(true);
         try {
+            // 저장 시 반드시 현재 날짜(g_lastDate)를 포함하여 저장
             await fetch(G_SCRIPT_URL, {
                 method: "POST",
-                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history })
+                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: g_lastDate || getToday() })
             });
             render();
         } catch (e) { alert("저장 실패!"); }
@@ -208,12 +244,12 @@
         currentMode = mode;
         closeMgmtModal();
         const select = document.getElementById('actionItemSelect');
-        // 가나다순으로 정렬해서 선택 목록 제공
         const sorted = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
         select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         
         document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
         document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
+        document.getElementById('actionQty').value = 0;
         
         const confirmBtn = document.getElementById('actionConfirmBtn');
         if(mode === 'in') {
