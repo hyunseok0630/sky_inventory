@@ -36,9 +36,9 @@
         .log-danger { color: #ff7675; }
         .log-warning { color: #fdcb6e; }
         
-        /* 히스토리 그리드 (판매/입고 반반) */
-        .history-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
+        /* 히스토리 상하 배치 레이아웃 */
+        .history-layout { display: flex; flex-direction: column; gap: 20px; }
+        .history-list { max-height: 350px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-day-in { border-left-color: var(--accent); }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
@@ -153,7 +153,7 @@
                     <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">이번달 판매내역 엑셀저장</button>
                 </div>
                 
-                <div class="history-grid">
+                <div class="history-layout">
                     <div>
                         <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
                         <div id="historyContainer" class="history-list"></div>
@@ -220,7 +220,6 @@
 
     const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
 
-    // ★ 백업 함수에 입고내역(inHistory)과 매칭규칙(map)까지 완벽하게 포함
     function saveStateForUndo() {
         backup_state = { 
             master: JSON.parse(JSON.stringify(db_master)), 
@@ -231,7 +230,6 @@
         document.getElementById('undoBtn').disabled = false;
     }
 
-    // ★ 되돌리기 실행 시 누락 없이 전체 데이터 복구
     async function undoLastAction() {
         if (!backup_state) return;
         toggleLoading(true);
@@ -372,7 +370,6 @@
                     fileInput.value = ""; return;
                 }
 
-                // ★ 엑셀 업로드 직전의 전체 스냅샷 저장
                 let snapshot_master = JSON.parse(JSON.stringify(db_master));
                 let snapshot_history = JSON.parse(JSON.stringify(db_history));
                 let snapshot_in_history = JSON.parse(JSON.stringify(db_in_history));
@@ -410,7 +407,6 @@
                 }
 
                 if(applyCount > 0) {
-                    // ★ 엑셀 데이터 반영 후, 스냅샷을 백업본으로 저장
                     backup_state = { 
                         master: snapshot_master, 
                         history: snapshot_history,
@@ -529,7 +525,7 @@
     }
     
     async function deleteMap(idx) {
-        saveStateForUndo(); // ★ 매칭 규칙 삭제 전에도 1건 백업 생성
+        saveStateForUndo(); 
         db_map.splice(idx, 1);
         await saveToCloud();
         addLog("매칭 규칙 삭제 완료", "success");
@@ -577,7 +573,7 @@
         const idx = db_master.findIndex(i => i.name === itemName);
         if(idx === -1) return;
 
-        saveStateForUndo(); // ★ 관리 작업(입고, 수정, 삭제) 직전 1건 백업 생성
+        saveStateForUndo(); 
 
         if(currentMode === 'in') {
             db_master[idx].initial += qty;
@@ -596,7 +592,7 @@
         const name = document.getElementById('mName').value.trim();
         if(!name) return;
         
-        saveStateForUndo(); // ★ 품목 추가 직전 1건 백업 생성
+        saveStateForUndo(); 
 
         db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0 });
         await saveToCloud();
@@ -611,7 +607,7 @@
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
-            saveStateForUndo(); // ★ 수기 반영 직전 1건 백업 생성
+            saveStateForUndo(); 
             item.sold += qty; 
             addHistory(name, qty, source); 
             await saveToCloud(); 
@@ -624,7 +620,7 @@
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
         if(!exName || targets.length === 0) { alert("연결할 내부 품목을 체크해주세요!"); return; }
         
-        saveStateForUndo(); // ★ 매칭 규칙 추가 직전 1건 백업 생성
+        saveStateForUndo(); 
         
         db_map.push({ exName, targets });
         await saveToCloud();
