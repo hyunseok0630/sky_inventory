@@ -311,8 +311,8 @@
         if(!file) return;
         const fileName = file.name;
         let source = "엑셀반영";
-        if(fileName.includes("쿠팡")) source = "쿠팡";
-        else if(fileName.includes("네이버")) source = "네이버";
+        if(fileName.includes("DeliveryList")) source = "쿠팡";
+        else if(fileName.includes("스마트스토어")) source = "네이버";
         
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -434,3 +434,4 @@
 </script>
 </body>
 </html>
+
