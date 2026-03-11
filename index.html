@@ -34,6 +34,7 @@
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
+        .log-warning { color: #fdcb6e; }
         
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
@@ -213,7 +214,7 @@
         toggleLoading(false);
     }
 
-    // ★★★ 완전히 새로워진 스마트 엑셀 인식 엔진 ★★★
+    // 🌟 핵심: 규칙은 있지만 연결 품목이 없을 때도 잡아내도록 로직 수정
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -232,11 +233,10 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const wb = XLSX.read(data, { type: 'array' });
-                // 엑셀의 모든 데이터를 빈칸 포함하여 배열로 변환
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
                 
                 if (rows.length === 0) {
-                    addLog("엑셀 파일이 비어있거나 읽을 수 없는 형식입니다.", "danger");
+                    addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
                     return;
                 }
 
@@ -244,49 +244,55 @@
                 let failNames = new Set();
                 let parsedRows = 0;
 
-                // 1. 유연한 열(컬럼) 이름 자동 탐지
                 let titleKey = null;
                 let qtyKey = null;
 
                 for (let r of rows) {
                     const keys = Object.keys(r);
-                    // 띄어쓰기를 모두 없앤 후 키워드가 포함되어 있는지 확인
                     if (!titleKey) titleKey = keys.find(k => String(k).replace(/\s/g,'').match(/상품명|옵션명|상품이름|주문상품/));
                     if (!qtyKey) qtyKey = keys.find(k => String(k).replace(/\s/g,'').match(/수량|구매수/));
                     if (titleKey) break; 
                 }
 
-                // 상품명 열을 끝내 찾지 못했을 경우의 디버그 로그
                 if (!titleKey) {
-                    const sampleKeys = Object.keys(rows[0]||{}).join(', ');
-                    addLog(`❌ 상품명 항목을 찾지 못했습니다. 엑셀 제목란: [${sampleKeys}]`, "danger");
+                    addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger");
                     fileInput.value = "";
                     return;
                 }
 
-                // 2. 데이터 추출 및 매칭
                 rows.forEach(row => {
                     const rawTitle = row[titleKey];
-                    if(!rawTitle || String(rawTitle).trim() === "") return; // 빈 칸 건너뛰기
+                    if(!rawTitle || String(rawTitle).trim() === "") return; 
 
                     parsedRows++;
                     const title = String(rawTitle).trim(); 
                     let qty = 1;
                     
                     if(qtyKey && row[qtyKey]) {
-                        // "2개" 등 텍스트가 섞여 있어도 숫자만 추출
                         qty = parseInt(String(row[qtyKey]).replace(/[^0-9]/g, '')) || 1; 
                     }
 
-                    // 매칭 규칙 비교 (양끝 공백 무시)
                     const rule = db_map.find(m => m.exName.trim() === title);
                     
                     if(rule) {
-                        rule.targets.forEach(tName => { 
-                            const item = db_master.find(i => i.name === tName); 
-                            if(item) { item.sold += qty; addHistory(tName, qty, source); applyCount++; } 
-                        });
+                        let appliedToItem = false;
+                        if(rule.targets && rule.targets.length > 0) {
+                            rule.targets.forEach(tName => { 
+                                const item = db_master.find(i => i.name === tName); 
+                                if(item) { 
+                                    item.sold += qty; 
+                                    addHistory(tName, qty, source); 
+                                    applyCount++; 
+                                    appliedToItem = true;
+                                } 
+                            });
+                        }
+                        // 매칭 규칙은 있는데 체크된 품목이 없거나, 품목이 삭제된 경우
+                        if(!appliedToItem) {
+                            failNames.add(title + " (체크된 품목 없음)");
+                        }
                     } else {
+                        // 매칭 규칙 자체가 없는 경우
                         failNames.add(title);
                     }
                 });
@@ -295,14 +301,13 @@
                     await saveToCloud();
                     addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
                 } else {
-                    addLog(`반영 0건 (인식된 상품 ${parsedRows}개). 아래 미매칭 상품을 추가해 주세요.`, "danger");
+                    addLog(`반영 0건 (인식된 상품 ${parsedRows}개). 아래 로그를 확인해주세요.`, "warning");
                 }
 
-                // 매칭 실패 항목 상세 노출
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
                     const displayFails = failArr.slice(0, 3).join(', ');
-                    addLog(`[미매칭 상품]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
+                    addLog(`[미매칭/오류 상품]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
                 
                 fileInput.value = "";
@@ -441,7 +446,10 @@
     async function addMap() {
         const exName = document.getElementById('exName').value.trim();
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
-        if(!exName || targets.length === 0) return;
+        if(!exName || targets.length === 0) {
+            alert("연결할 내부 품목을 체크해주세요!");
+            return;
+        }
         db_map.push({ exName, targets });
         await saveToCloud();
         addLog(`규칙 추가: ${exName}`, "info");
