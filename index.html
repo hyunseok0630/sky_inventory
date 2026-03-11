@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>SKY Commerce - Smart Management</title>
+    <title>SKY Commerce - Logic & Log Enhanced</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
@@ -22,10 +22,26 @@
         th, td { border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
-        /* 당일 매출 합계 영역 */
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
-        /* 5. 전체 판매 히스토리 스타일 */
+        /* 작업 로그 스타일 */
+        .log-area { 
+            margin-top: 15px; 
+            padding: 10px; 
+            background: #2d3436; 
+            color: #dfe6e9; 
+            border-radius: 6px; 
+            font-family: 'Courier New', Courier, monospace; 
+            font-size: 12px; 
+            height: 100px; 
+            overflow-y: auto; 
+            line-height: 1.6;
+        }
+        .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
+        .log-success { color: #55efc4; }
+        .log-info { color: #74b9ff; }
+
+        /* 히스토리 스타일 */
         .history-list { max-height: 400px; overflow-y: auto; font-size: 13px; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
@@ -36,14 +52,13 @@
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
-        /* 기타 UI 요소 */
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
         .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
         .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; padding: 5px; }
-        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #f1f3f5; }
+        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-bottom: 1px solid #f1f3f5; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -101,6 +116,9 @@
                     <input type="file" id="exFile" accept=".xlsx, .xls">
                     <button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀반영</button>
                 </div>
+                <div id="actionLog" class="log-area">
+                    <div class="log-entry log-info">> 시스템 준비 완료.</div>
+                </div>
             </div>
 
             <div class="card">
@@ -119,15 +137,23 @@
 </div>
 
 <script>
-    // Google App Script URL
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzbPRpVqqrbRUZAmnGpZMP-r3uFCLbhj7YFR5R1QSQQ_PrUiOno-3Jdw_3NCEIZV_4/exec";
     
     let db_master = [], db_map = [], db_history = [];
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
-    function getToday() { return new Date().toISOString().slice(0, 10); }
+    function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
 
-    // 클라우드 데이터 로드
+    // 로그 추가 함수
+    function addLog(msg, type='info') {
+        const logArea = document.getElementById('actionLog');
+        const now = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = `log-entry log-${type}`;
+        entry.innerText = `[${now}] ${msg}`;
+        logArea.prepend(entry);
+    }
+
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -137,37 +163,30 @@
             db_map = data.map || [];
             db_history = data.history || [];
             
-            // 날짜 변경 시 재고 이월 로직
             const today = getToday();
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
+                addLog(`날짜 변경 감지 (${data.lastDate} -> ${today}): 재고 이월 완료`);
                 await saveToCloud();
             }
             document.getElementById('currentDateDisp').innerText = today;
             render();
-        } catch (e) { alert("데이터 연동 오류!"); }
+        } catch (e) { addLog("데이터 연동 중 오류 발생", "danger"); }
         toggleLoading(false);
     }
 
-    // 클라우드 데이터 저장
     async function saveToCloud() {
         toggleLoading(true);
-        // history 객체에 source 정보가 포함되어 전송됩니다.
-        await fetch(G_SCRIPT_URL, { 
-            method: "POST", 
-            body: JSON.stringify({ 
-                action: "save", 
-                master: db_master, 
-                map: db_map, 
-                history: db_history, 
-                lastDate: getToday() 
-            })
-        });
-        render();
+        try {
+            await fetch(G_SCRIPT_URL, { 
+                method: "POST", 
+                body: JSON.stringify({ action: "save", master: db_master, map: db_map, history: db_history, lastDate: getToday() })
+            });
+            render();
+        } catch(e) { addLog("서버 저장 실패", "danger"); }
         toggleLoading(false);
     }
 
-    // 엑셀 분석 및 판매처 자동 분류
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -175,9 +194,10 @@
 
         let source = "기타";
         const fileName = file.name;
-        
         if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
+
+        addLog(`파일 읽기 시작: ${fileName} (${source})`);
 
         const reader = new FileReader();
         reader.onload = async function(e) {
@@ -185,6 +205,7 @@
             const wb = XLSX.read(data, { type: 'array' });
             const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
             
+            let applyCount = 0;
             rows.forEach(row => {
                 const title = row['상품명'] || row['등록상품명'] || row['주문상품명'];
                 const qty = parseInt(row['수량'] || row['구매수량']) || 1;
@@ -192,48 +213,35 @@
                     const rule = db_map.find(m => m.exName.trim() === title.trim());
                     if(rule) rule.targets.forEach(tName => { 
                         const item = db_master.find(i => i.name === tName); 
-                        if(item) { item.sold += qty; addHistory(tName, qty, source); } 
+                        if(item) { item.sold += qty; addHistory(tName, qty, source); applyCount++; } 
                     });
                 }
             });
             await saveToCloud();
+            addLog(`${applyCount}건의 판매 데이터가 반영되었습니다.`, "success");
             fileInput.value = "";
         };
         reader.readAsArrayBuffer(file);
     }
 
     function addHistory(name, qty, source) {
-        db_history.push({ date: getToday(), name: name, qty: qty, source: source });
+        db_history.push({ date: getToday(), name, qty, source });
     }
 
-    // 핵심: 실시간 렌더링 및 매출 합계 계산
     function render() {
         const table = document.getElementById('mainTable');
         const search = document.getElementById('inventorySearch').value.toLowerCase();
-        let dayTotalSales = 0; // 합계 변수 초기화
+        let dayTotalSales = 0;
 
-        // 1. 재고 테이블 및 매출 합산
         table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => {
             const currentStock = item.initial - item.sold;
             const salesAmount = item.sold * item.price;
-            dayTotalSales += salesAmount; // 실시간 합산
-
-            return `
-                <tr>
-                    <td style="text-align:left"><b>${item.name}</b></td>
-                    <td>${item.price.toLocaleString()}</td>
-                    <td>${item.initial}</td>
-                    <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                    <td>${currentStock}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td>
-                </tr>
-            `;
+            dayTotalSales += salesAmount;
+            return `<tr><td style="text-align:left"><b>${item.name}</b></td><td>${item.price.toLocaleString()}</td><td>${item.initial}</td><td style="color:var(--point); font-weight:bold;">${item.sold}</td><td>${currentStock}</td><td style="color:var(--accent); font-weight:bold;">${salesAmount.toLocaleString()}</td></tr>`;
         }).join('');
 
-        // 2. 매출 합계 텍스트 업데이트 (오류 수정 지점)
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
 
-        // 3. 히스토리 렌더링 (판매처 포함)
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -250,8 +258,7 @@
                 let total = 0, tags = "";
                 Object.keys(grouped[date][name]).forEach(src => {
                     total += grouped[date][name][src];
-                    const cls = `tag-${src}`;
-                    tags += `<span class="source-tag ${cls}">${src} ${grouped[date][name][src]}</span> `;
+                    tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span> `;
                 });
                 hHtml += `<div class="history-row"><span>${name}</span><div style="text-align:right"><b>총 ${total}개</b><br>${tags}</div></div>`;
             });
@@ -259,12 +266,9 @@
         });
         historyList.innerHTML = hHtml || "데이터 없음";
 
-        // 품목 선택 UI 업데이트
         document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         const sortedItems = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
-        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `
-            <label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>
-        `).join('');
+        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
     }
 
     async function addItem() {
@@ -272,6 +276,7 @@
         if(!name) return;
         db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0 });
         await saveToCloud();
+        addLog(`신규 품목 추가: ${name}`);
         document.getElementById('mName').value = "";
     }
 
@@ -279,7 +284,12 @@
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
         const item = db_master.find(i => i.name === name);
-        if(item) { item.sold += qty; addHistory(name, qty, "수기"); await saveToCloud(); }
+        if(item) { 
+            item.sold += qty; 
+            addHistory(name, qty, "수기"); 
+            await saveToCloud(); 
+            addLog(`수기 반영: ${name} ${qty}개`, "success");
+        }
     }
 
     async function addMap() {
@@ -288,6 +298,7 @@
         if(!exName || targets.length === 0) return;
         db_map.push({ exName, targets });
         await saveToCloud();
+        addLog(`매칭 규칙 추가: ${exName} -> ${targets.join(', ')}`);
         document.getElementById('exName').value = "";
     }
 
