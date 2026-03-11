@@ -191,6 +191,9 @@
         logArea.prepend(entry);
     }
 
+    // ★ 문자열의 모든 띄어쓰기 및 특수 괄호, 따옴표를 완전히 제거해버리는 철벽 함수
+    const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
+
     async function loadFromCloud() {
         toggleLoading(true);
         try {
@@ -199,26 +202,20 @@
             
             db_master = data.master || [];
             
-            // 🌟 1. 매칭(Map) 데이터 자동 복구 로직 (undefined 치료)
             db_map = (data.map || []).map(m => {
                 let t = m.targets || [];
-                // 옛날 방식으로 저장된 텍스트 배열을 정상 배열로 파싱
                 if (typeof t === 'string') {
                     try { t = JSON.parse(t); } catch(e) { t = t.split(','); }
                 }
                 if (!Array.isArray(t)) t = [t];
-                // 'undefined' 글자가 들어가 있으면 걸러버림
-                t = t.map(x => String(x).trim()).filter(x => x && x !== 'undefined' && x !== 'null');
+                // 저장된 매칭 타겟의 더미 문자열도 안전하게 청소
+                t = t.map(x => String(x).replace(/[\[\]"]/g, '').trim()).filter(x => x && x !== 'undefined' && x !== 'null');
                 return { exName: String(m.exName || '').trim(), targets: t };
-            }).filter(m => m.exName); // 연결 품목이 없어도 엑셀 이름이 있으면 일단 유지 (모달에서 지우게)
+            }).filter(m => m.exName);
 
-            // 🌟 2. 히스토리(History) 날짜 오류 자동 복구 로직
             db_history = (data.history || []).map(h => {
                 let d = h.date || getToday();
-                // 2026-03-10T15:00:00.000Z 같은 형태를 발견하면 한국 시간 YYYY-MM-DD로 복구
-                if (d.includes('T')) {
-                    d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
-                }
+                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
                 return { ...h, date: d, name: h.name || '알수없음' };
             });
             
@@ -245,6 +242,7 @@
         toggleLoading(false);
     }
 
+    // 🌟 띄어쓰기 무시 매칭이 적용된 핵심 로직
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -264,7 +262,7 @@
                 const wb = XLSX.read(data, { type: 'array' });
                 const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
                 
-                if (rows.length === 0) return addLog("엑셀 파일이 비어있습니다.", "danger");
+                if (rows.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
 
                 let applyCount = 0;
                 let failNames = new Set();
@@ -282,8 +280,7 @@
 
                 if (!titleKey) {
                     addLog(`❌ 엑셀에 '상품명' 항목이 없습니다.`, "danger");
-                    fileInput.value = "";
-                    return;
+                    fileInput.value = ""; return;
                 }
 
                 rows.forEach(row => {
@@ -292,38 +289,45 @@
 
                     parsedRows++;
                     const title = String(rawTitle).trim(); 
-                    let qty = 1;
-                    if(qtyKey && row[qtyKey]) {
-                        qty = parseInt(String(row[qtyKey]).replace(/[^0-9]/g, '')) || 1; 
-                    }
+                    let qty = parseInt(String(row[qtyKey]||'1').replace(/[^0-9]/g, '')) || 1; 
 
-                    const rule = db_map.find(m => m.exName.trim() === title);
+                    // ★ 변경점: 엑셀 이름과 맵핑 이름의 '모든 띄어쓰기'를 지우고 순수 글자로만 비교합니다.
+                    const rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title));
                     
                     if(rule) {
                         let appliedToItem = false;
                         if(rule.targets && rule.targets.length > 0) {
                             rule.targets.forEach(tName => { 
-                                const item = db_master.find(i => i.name === tName); 
-                                if(item) { item.sold += qty; addHistory(tName, qty, source); applyCount++; appliedToItem = true; } 
+                                // ★ 변경점: 내부 품목 이름과 체크박스로 지정했던 이름도 띄어쓰기를 무시하고 비교합니다.
+                                const item = db_master.find(i => cleanStr(i.name) === cleanStr(tName)); 
+                                if(item) { 
+                                    item.sold += qty; 
+                                    addHistory(item.name, qty, source); // 원래 이름으로 예쁘게 저장
+                                    applyCount++; 
+                                    appliedToItem = true; 
+                                } 
                             });
                         }
-                        if(!appliedToItem) failNames.add(title + " (연결품목 없음)");
+                        if(!appliedToItem) {
+                            // 찾았는데 마스터에 품목이 없다면, 어떤 대상을 찾으려다 실패했는지 친절하게 안내
+                            failNames.add(`[매칭됨, 품목없음] ${title} 👉 연결대상: ${rule.targets.join(', ')}`);
+                        }
                     } else {
-                        failNames.add(title);
+                        failNames.add(title); // 규칙 자체가 없는 경우
                     }
                 });
 
                 if(applyCount > 0) {
                     await saveToCloud();
-                    addLog(`${applyCount}건의 데이터가 성공적으로 반영되었습니다.`, "success");
+                    addLog(`${applyCount}건의 데이터가 완벽하게 반영되었습니다.`, "success");
                 } else {
-                    addLog(`반영 0건. 아래 로그를 확인해주세요.`, "warning");
+                    addLog(`반영 0건. 미매칭 내역을 확인해주세요.`, "warning");
                 }
 
                 if(failNames.size > 0) {
                     const failArr = Array.from(failNames);
-                    const displayFails = failArr.slice(0, 3).join(', ');
-                    addLog(`[미매칭/오류 상품]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
+                    const displayFails = failArr.slice(0, 3).join(' | ');
+                    addLog(`[오류 내역]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
                 
                 fileInput.value = "";
@@ -333,7 +337,6 @@
     }
 
     function addHistory(name, qty, source) {
-        // 이름이 undefined 같은 이상한 문자열로 들어오는 것을 방어
         if (!name || name === 'undefined' || name === 'null') return;
         db_history.push({ date: getToday(), name: name, qty: qty, source: source });
     }
@@ -365,7 +368,6 @@
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
-            // undefined 예외 방어
             const safeName = obj.name === 'undefined' ? '알수없음(오류복구)' : obj.name;
             acc[obj.date][safeName] = acc[obj.date][safeName] || {};
             let s = obj.source || '수기';
@@ -396,7 +398,6 @@
         `).join('');
     }
 
-    // --- 매칭 규칙 관리 모달 기능 (복구됨) ---
     function openMapModal() {
         const list = document.getElementById('mapList');
         list.innerHTML = db_map.map((m, i) => `
@@ -410,17 +411,14 @@
         `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
         document.getElementById('mapModal').style.display = 'block';
     }
-    
     function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
-    
     async function deleteMap(idx) {
         db_map.splice(idx, 1);
         await saveToCloud();
         addLog("매칭 규칙이 삭제되었습니다.", "success");
-        openMapModal(); // 모달 창 갱신
+        openMapModal();
     }
 
-    // --- 일반 모달 관리 ---
     function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
     function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
     let currentMode = '';
@@ -430,11 +428,9 @@
         const select = document.getElementById('actionItemSelect');
         const sorted = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
         select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-        
         document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
         document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
         document.getElementById('actionQty').value = 0;
-        
         const confirmBtn = document.getElementById('actionConfirmBtn');
         if(mode === 'in') {
             document.getElementById('actionTitle').innerText = "📦 입고 수량 추가";
@@ -451,7 +447,6 @@
             confirmBtn.innerText = "삭제하기";
             confirmBtn.style.background = 'var(--danger)';
         }
-        
         confirmBtn.onclick = processMgmtAction;
         document.getElementById('actionModal').style.display = 'block';
     }
@@ -461,11 +456,9 @@
         const qty = parseInt(document.getElementById('actionQty').value) || 0;
         const idx = db_master.findIndex(i => i.name === itemName);
         if(idx === -1) return;
-
         if(currentMode === 'in') db_master[idx].initial += qty;
         else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; }
         else if(currentMode === 'del') db_master.splice(idx, 1);
-        
         await saveToCloud();
         addLog(`관리 완료: ${itemName}`, "success");
         closeActionModal();
@@ -489,7 +482,7 @@
 
     async function addMap() {
         const exName = document.getElementById('exName').value.trim();
-        const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value);
+        const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
         if(!exName || targets.length === 0) {
             alert("연결할 내부 품목을 아래 체크박스에서 선택해주세요!");
             return;
@@ -498,6 +491,9 @@
         await saveToCloud();
         addLog(`규칙 추가: ${exName}`, "info");
         document.getElementById('exName').value = "";
+        
+        // 추가 후 체크박스 초기화
+        document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
     }
 
     loadFromCloud();
