@@ -36,7 +36,6 @@
         .log-danger { color: #ff7675; }
         .log-warning { color: #fdcb6e; }
         
-        /* 히스토리 상하 배치 레이아웃 */
         .history-layout { display: flex; flex-direction: column; gap: 20px; }
         .history-list { max-height: 350px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
@@ -48,14 +47,15 @@
         .history-sales-header { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
         .history-sales-tags { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; justify-content: flex-end; }
         
-        /* 💡 수정됨: 어떠한 글자가 들어와도 무조건 회색 테두리의 둥근 박스가 되도록 기본값 설정! */
+        /* 모든 태그 공통 디자인 */
         .source-tag { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #ced4da; background: #f8f9fa; color: #495057; }
         
-        /* 지정된 판매처 태그 색상 정의 (위의 기본값을 덮어씀) */
+        /* 지정 판매처별 포인트 색상 */
+        .tag-세미트론 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
         .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
-        .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
+        .tag-SSG { background: #fce4ec; color: #c2185b; border-color: #f8bbd0; }
 
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
@@ -131,7 +131,13 @@
                 <div class="action-row">
                     <select id="directItemSelect" style="flex:2;"></select>
                     <input type="number" id="directQty" value="1" min="1" style="flex:1;">
-                    <input type="text" id="directSource" value="수기" placeholder="판매처(예:당근)" style="flex:1.5;">
+                    <select id="directSource" style="flex:1.5;">
+                        <option value="세미트론">세미트론</option>
+                        <option value="쿠팡">쿠팡</option>
+                        <option value="네이버">네이버</option>
+                        <option value="컴퓨존">컴퓨존</option>
+                        <option value="SSG">SSG</option>
+                    </select>
                     <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
                 </div>
                 <div class="action-row">
@@ -484,7 +490,7 @@
             acc[obj.date] = acc[obj.date] || {};
             const safeName = obj.name === 'undefined' ? '알수없음' : obj.name;
             acc[obj.date][safeName] = acc[obj.date][safeName] || {};
-            let s = obj.source || '수기';
+            let s = obj.source || '기타';
             acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
             return acc; 
         }, {});
@@ -623,7 +629,7 @@
     async function applyDirectSale() {
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
-        const source = document.getElementById('directSource').value.trim() || "수기";
+        const source = document.getElementById('directSource').value || "기타";
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
@@ -660,7 +666,7 @@
         monthlyData.forEach(row => {
             const name = row.name;
             const qty = parseInt(row.qty) || 0;
-            const source = row.source || "수기";
+            const source = row.source || "기타";
 
             if (!summary[name]) summary[name] = { "총 판매수량": 0 };
             summary[name]["총 판매수량"] += qty;
