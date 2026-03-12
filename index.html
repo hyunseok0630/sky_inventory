@@ -43,12 +43,13 @@
         .history-day-in { border-left-color: var(--accent); }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
-        .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; }
+        /* 태그 자동 줄바꿈 적용 (white-space: nowrap로 글자 깨짐 방지) */
+        .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; white-space: nowrap; }
         
-        /* 판매처 태그 색상 정의 */
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
         .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
+        .tag-당근 { background: #ffe0b2; color: #e65100; border-color: #ffb74d; }
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
@@ -126,7 +127,8 @@
                 <div class="action-row">
                     <select id="directItemSelect" style="flex:2;"></select>
                     <input type="number" id="directQty" value="1" min="1" style="flex:1;">
-                    <input type="text" id="directSource" value="수기" placeholder="판매처(예:당근)" style="flex:1.5;">
+                    <select id="directSource" style="flex:1.5;"></select>
+                    <button class="btn" style="background:var(--secondary); color:white; padding:0 10px; flex:0.4;" onclick="addNewSource()" title="새 판매처 추가">+</button>
                     <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
                 </div>
                 <div class="action-row">
@@ -200,9 +202,11 @@
 </div>
 
 <script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzavQ6un_cwtUa59yxn5bWyjn9M1W0smDAt5uQal1UMi6L0YOQQi0DPWyZjxjcd0e4/exec";
+    // ★ 사용자가 알려준 새로운 구글 앱스 스크립트 주소 교체 완료
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMIob7m72PKwlSCWhKEr5BmZMTyXZa7Z6RtSP7uqspE1Gsv7rLVl3IDY9fkgN5N959/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
+    let db_sources = ['수기', '당근', '쿠팡', '네이버', '컴퓨존']; // 기본 판매처 목록
     let backup_state = null;
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
@@ -225,7 +229,8 @@
             master: JSON.parse(JSON.stringify(db_master)), 
             history: JSON.parse(JSON.stringify(db_history)),
             inHistory: JSON.parse(JSON.stringify(db_in_history)),
-            map: JSON.parse(JSON.stringify(db_map))
+            map: JSON.parse(JSON.stringify(db_map)),
+            sources: JSON.parse(JSON.stringify(db_sources)) // 판매처 백업 추가
         };
         document.getElementById('undoBtn').disabled = false;
     }
@@ -237,6 +242,7 @@
         db_history = backup_state.history;
         db_in_history = backup_state.inHistory;
         db_map = backup_state.map;
+        db_sources = backup_state.sources; // 판매처 복구
         
         backup_state = null;
         document.getElementById('undoBtn').disabled = true;
@@ -245,11 +251,12 @@
             await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sources: db_sources,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
             addLog("⚠️ 방금 전 1건의 작업이 정확히 취소(되돌리기) 되었습니다.", "warning");
+            renderSources(); // 드롭다운 갱신
             render();
         } catch (e) {
             addLog("되돌리기 상태 저장에 실패했습니다.", "danger");
@@ -284,6 +291,11 @@
                 return { ...h, date: d };
             });
             
+            // 판매처 배열 로드 (비어있으면 기본값 유지)
+            if(data.sources && data.sources.length > 0) {
+                db_sources = data.sources;
+            }
+            
             const today = getToday();
             const currentMonth = getCurrentMonth();
             let needsSave = false;
@@ -303,6 +315,8 @@
             document.getElementById('currentDateDisp').innerText = today;
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
+            
+            renderSources(); // 판매처 드롭다운 렌더링
             render();
         } catch (e) { addLog("데이터 연동 오류!", "danger"); }
         toggleLoading(false);
@@ -314,13 +328,44 @@
             await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sources: db_sources,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
             render();
         } catch (e) { addLog("구글 시트 저장 실패", "danger"); }
         toggleLoading(false);
+    }
+
+    // ★ 판매처 목록 렌더링 함수
+    function renderSources() {
+        const sel = document.getElementById('directSource');
+        const currentVal = sel.value;
+        sel.innerHTML = db_sources.map(s => `<option value="${s}">${s}</option>`).join('');
+        if(currentVal && db_sources.includes(currentVal)) {
+            sel.value = currentVal;
+        } else if (db_sources.length > 0) {
+            sel.value = db_sources[0];
+        }
+    }
+
+    // ★ 새로운 판매처 추가 함수
+    async function addNewSource() {
+        const newSrc = prompt("새로운 판매처 이름을 입력하세요 (예: 11번가, 오늘의집):");
+        if(newSrc && newSrc.trim() !== "") {
+            const cleanSrc = newSrc.trim();
+            if(!db_sources.includes(cleanSrc)) {
+                saveStateForUndo(); 
+                db_sources.push(cleanSrc);
+                renderSources();
+                document.getElementById('directSource').value = cleanSrc;
+                await saveToCloud();
+                addLog(`신규 판매처 추가: ${cleanSrc}`, "success");
+            } else {
+                alert("이미 등록된 판매처입니다.");
+                document.getElementById('directSource').value = cleanSrc;
+            }
+        }
     }
 
     function loadExcel() {
@@ -356,7 +401,6 @@
                 let qtyColIdx = -1;
                 let optColIdx = -1;
 
-                // ★ 옵션(옵션정보, 옵션명) 열을 추가로 검색합니다.
                 for (let i = 0; i < Math.min(20, rawData.length); i++) {
                     const row = rawData[i];
                     for (let j = 0; j < row.length; j++) {
@@ -384,8 +428,6 @@
                     if(!rawTitle || String(rawTitle).trim() === "") continue; 
 
                     parsedRows++;
-                    
-                    // ★ 상품명과 옵션명을 가져와 하나로 예쁘게 합칩니다.
                     const title = String(rawTitle).trim(); 
                     const opt = (optColIdx !== -1 && row[optColIdx]) ? String(row[optColIdx]).trim() : "";
                     const fullTitle = opt ? `${title} [${opt}]` : title;
@@ -395,10 +437,9 @@
                         qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, '')) || 1;
                     }
 
-                    // ★ 다단계 매칭 (가장 정확한 것부터 순서대로 찾기)
-                    let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle)); // 1. 전체 풀네임 검색
-                    if (!rule && opt) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(opt)); // 2. 옵션명으로만 검색
-                    if (!rule) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title)); // 3. 상품명으로만 검색
+                    let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle)); 
+                    if (!rule && opt) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(opt)); 
+                    if (!rule) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title)); 
                     
                     if(rule) {
                         let appliedToItem = false;
@@ -422,7 +463,8 @@
                         master: snapshot_master, 
                         history: snapshot_history,
                         inHistory: snapshot_in_history,
-                        map: snapshot_map
+                        map: snapshot_map,
+                        sources: JSON.parse(JSON.stringify(db_sources))
                     };
                     document.getElementById('undoBtn').disabled = false;
                     
@@ -496,7 +538,15 @@
                     total += grouped[date][name][src];
                     tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span> `;
                 });
-                hHtml += `<div class="history-row"><span style="flex:1;">${name}</span><div style="text-align:right"><b>총 ${total}</b><br>${tags}</div></div>`;
+                
+                // ★ 자동 줄바꿈(flex-wrap) 적용 및 레이아웃 수정
+                hHtml += `<div class="history-row" style="align-items:flex-start;">
+                            <span style="flex:1; padding-top:4px;">${name}</span>
+                            <div style="text-align:right; max-width:65%;">
+                                <b style="display:block; margin-bottom:6px;">총 ${total}</b>
+                                <div style="display:flex; flex-wrap:wrap; gap:4px; justify-content:flex-end;">${tags}</div>
+                            </div>
+                          </div>`;
             });
             hHtml += `</div>`;
         });
@@ -614,7 +664,7 @@
     async function applyDirectSale() {
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
-        const source = document.getElementById('directSource').value.trim() || "수기";
+        const source = document.getElementById('directSource').value; // select박스 값
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
