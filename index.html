@@ -43,13 +43,14 @@
         .history-day-in { border-left-color: var(--accent); }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
-        /* 태그 자동 줄바꿈 적용 (white-space: nowrap로 글자 깨짐 방지) */
+        /* 태그 자동 줄바꿈 적용 */
         .source-tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; border: 1px solid transparent; white-space: nowrap; }
         
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
         .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
-        .tag-당근 { background: #ffe0b2; color: #e65100; border-color: #ffb74d; }
+        /* 당근 제거 후 세미트론 전용 민트색 태그 추가 */
+        .tag-세미트론 { background: #e0f2f1; color: #00695c; border-color: #b2dfdb; }
         .tag-수기 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-기타 { background: #f5f5f5; color: #616161; border-color: #e0e0e0; }
 
@@ -202,11 +203,11 @@
 </div>
 
 <script>
-    // ★ 사용자가 알려준 새로운 구글 앱스 스크립트 주소 교체 완료
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxMIob7m72PKwlSCWhKEr5BmZMTyXZa7Z6RtSP7uqspE1Gsv7rLVl3IDY9fkgN5N959/exec";
+    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx2gtj1rmZvX09SktRPot5-ebZcocx4rRT_y8WN3S_5TsQHAJll5ufA6wGLNOqhWBbB/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
-    let db_sources = ['수기', '당근', '쿠팡', '네이버', '컴퓨존']; // 기본 판매처 목록
+    // 💡 기본 판매처에서 당근을 지우고 '세미트론'을 넣었습니다!
+    let db_sources = ['수기', '세미트론', '쿠팡', '네이버', '컴퓨존']; 
     let backup_state = null;
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
@@ -230,7 +231,7 @@
             history: JSON.parse(JSON.stringify(db_history)),
             inHistory: JSON.parse(JSON.stringify(db_in_history)),
             map: JSON.parse(JSON.stringify(db_map)),
-            sources: JSON.parse(JSON.stringify(db_sources)) // 판매처 백업 추가
+            sources: JSON.parse(JSON.stringify(db_sources)) 
         };
         document.getElementById('undoBtn').disabled = false;
     }
@@ -242,7 +243,7 @@
         db_history = backup_state.history;
         db_in_history = backup_state.inHistory;
         db_map = backup_state.map;
-        db_sources = backup_state.sources; // 판매처 복구
+        db_sources = backup_state.sources; 
         
         backup_state = null;
         document.getElementById('undoBtn').disabled = true;
@@ -256,7 +257,7 @@
                 })
             });
             addLog("⚠️ 방금 전 1건의 작업이 정확히 취소(되돌리기) 되었습니다.", "warning");
-            renderSources(); // 드롭다운 갱신
+            renderSources(); 
             render();
         } catch (e) {
             addLog("되돌리기 상태 저장에 실패했습니다.", "danger");
@@ -291,7 +292,6 @@
                 return { ...h, date: d };
             });
             
-            // 판매처 배열 로드 (비어있으면 기본값 유지)
             if(data.sources && data.sources.length > 0) {
                 db_sources = data.sources;
             }
@@ -316,7 +316,7 @@
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
             
-            renderSources(); // 판매처 드롭다운 렌더링
+            renderSources(); 
             render();
         } catch (e) { addLog("데이터 연동 오류!", "danger"); }
         toggleLoading(false);
@@ -337,7 +337,6 @@
         toggleLoading(false);
     }
 
-    // ★ 판매처 목록 렌더링 함수
     function renderSources() {
         const sel = document.getElementById('directSource');
         const currentVal = sel.value;
@@ -349,7 +348,6 @@
         }
     }
 
-    // ★ 새로운 판매처 추가 함수
     async function addNewSource() {
         const newSrc = prompt("새로운 판매처 이름을 입력하세요 (예: 11번가, 오늘의집):");
         if(newSrc && newSrc.trim() !== "") {
@@ -539,7 +537,6 @@
                     tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span> `;
                 });
                 
-                // ★ 자동 줄바꿈(flex-wrap) 적용 및 레이아웃 수정
                 hHtml += `<div class="history-row" style="align-items:flex-start;">
                             <span style="flex:1; padding-top:4px;">${name}</span>
                             <div style="text-align:right; max-width:65%;">
@@ -664,7 +661,7 @@
     async function applyDirectSale() {
         const name = document.getElementById('directItemSelect').value;
         const qty = parseInt(document.getElementById('directQty').value) || 0;
-        const source = document.getElementById('directSource').value; // select박스 값
+        const source = document.getElementById('directSource').value; 
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
