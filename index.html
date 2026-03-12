@@ -266,7 +266,6 @@
     async function loadFromCloud() {
         toggleLoading(true);
         try {
-            // ★ 핵심 해결책: URL 끝에 무작위 시간을 붙여 브라우저가 예전 에러 화면(캐시)을 불러오지 못하게 강제합니다!
             const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime();
             const resp = await fetch(fetchUrl);
             const data = await resp.json();
@@ -401,6 +400,7 @@
 
                 for (let i = 0; i < Math.min(20, rawData.length); i++) {
                     const row = rawData[i];
+                    if (!row) continue; // 💡 빈 줄이 있을 경우 무시하고 넘어가도록 방어 코드 추가!
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j]).replace(/\s/g, '');
                         if (cellVal.match(/상품명|상품이름|주문상품|제품명/)) titleColIdx = j;
@@ -422,6 +422,8 @@
 
                 for (let i = headerRowIdx + 1; i < rawData.length; i++) {
                     const row = rawData[i];
+                    if (!row) continue; // 💡 여기서도 데이터 중 빈 줄이 나오면 무시하고 넘어가도록 처리!
+
                     const rawTitle = row[titleColIdx];
                     if(!rawTitle || String(rawTitle).trim() === "") continue; 
 
@@ -482,7 +484,7 @@
                     addLog(`[오류 내역]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
                 fileInput.value = "";
-            } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); }
+            } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); console.error(err); }
         };
         reader.readAsArrayBuffer(file);
     }
