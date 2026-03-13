@@ -365,11 +365,14 @@
                 needsSave = true;
             }
 
+            // 💡 [핵심 수정] 날이 바뀌었을 때 (Daily Rollover)
+            // '어제 판매량(sold)'만 기초재고에서 차감하고 초기화합니다.
+            // '전체 날짜 샘플(sampleQty)'은 누적이므로 차감하지도 않고 초기화하지도 않습니다.
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { 
-                    i.initial = i.initial - i.sold - (i.sampleQty || 0); 
+                    i.initial = i.initial - i.sold; 
                     i.sold = 0; 
-                    i.sampleQty = 0; 
+                    // i.sampleQty는 그대로 둡니다.
                 });
                 needsSave = true;
             }
@@ -539,7 +542,6 @@
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
 
-        // 💡 단가(price) 기준 내림차순 정렬 적용
         const sortedMasterData = [...db_master]
             .filter(i => (i.name || "").toLowerCase().includes(search))
             .sort((a, b) => (b.price || 0) - (a.price || 0));
@@ -633,7 +635,6 @@
         });
         inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
-        // 💡 드롭다운과 체크박스용 아이템은 입력하기 쉽게 기존 가나다순 유지!
         const sortedItemsForDropdown = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
         const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         
@@ -683,6 +684,7 @@
             confirmBtn.innerText = "입고하기";
             confirmBtn.style.background = 'var(--primary)';
         } else if(mode === 'edit') {
+            // 💡 실사 조정 시에는 기준선이 초기화되므로 샘플 누적량도 0이 됩니다.
             document.getElementById('actionTitle').innerText = "✏️ 재고 수량 수정";
             document.getElementById('qtyLabel').innerText = "수정할 실재고";
             confirmBtn.innerText = "수정하기";
