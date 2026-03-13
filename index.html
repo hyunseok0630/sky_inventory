@@ -31,10 +31,11 @@
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
         
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; }
-        .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
+        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; padding: 5px; }
+        .chk-item { display: flex; align-items: flex-start; padding: 10px 8px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; margin: 0; box-sizing: border-box; width: 100%; }
         .chk-item:hover { background: #f8f9fa; }
-        .chk-item span { font-size: 14px; flex: 1; text-align: left; margin-right: 15px; word-break: keep-all; line-height: 1.4; }
+        .chk-item input[type="checkbox"] { width: 16px; height: 16px; margin: 2px 10px 0 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
+        .chk-item span { font-size: 13px; flex: 1; text-align: left; word-break: break-all; line-height: 1.4; color: #333; }
         
         .log-area { margin-top: 15px; padding: 10px; background: #2d3436; color: #dfe6e9; border-radius: 6px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; line-height: 1.6; }
         .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
@@ -69,10 +70,12 @@
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
         
         .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
-        .search-box { position: relative; flex: 1; max-width: 300px; }
-        .search-box input { padding-left: 35px; margin-bottom: 0; border-color: var(--primary); height: 40px; }
-        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 10px; font-size: 16px; }
-        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; padding: 0 20px; font-size: 14px; white-space: nowrap; }
+        
+        /* 💡 검색창 및 버튼 정렬을 위한 CSS 완벽 수정 */
+        .search-box { position: relative; flex: 1; max-width: 300px; display: flex; align-items: center; }
+        .search-box input { padding-left: 35px; margin: 0; border-color: var(--primary); height: 40px; box-sizing: border-box; }
+        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; }
+        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; margin: 0; padding: 0 20px; font-size: 14px; white-space: nowrap; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
 
         .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
@@ -107,7 +110,7 @@
             <div class="card">
                 <div class="inventory-header">
                     <h3 style="margin:0; border:none; padding:0;">4. 실시간 재고 및 매출 현황</h3>
-                    <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end;">
+                    <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end; align-items: center;">
                         <div class="search-box">
                             <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
                         </div>
@@ -241,7 +244,6 @@
 <script>
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScq_LKH2f3kwLOX_Aeal/exec";
     
-    // 💡 샘플 히스토리 배열 추가
     let db_master = [], db_map = [], db_history = [], db_in_history = [], db_sample_history = [];
     let backup_state = null;
     let authPin = ""; 
@@ -349,7 +351,6 @@
                 return { ...h, date: d };
             });
 
-            // 💡 샘플 내역 불러오기
             db_sample_history = (data.sampleHistory || []).map(h => {
                 let d = h.date || getToday();
                 if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
@@ -366,7 +367,6 @@
                 needsSave = true;
             }
 
-            // 💡 날이 바뀌면 전날의 판매량과 '샘플출고량'을 모두 기초재고에서 완전히 빼고 리셋함
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { 
                     i.initial = i.initial - i.sold - (i.sampleQty || 0); 
@@ -541,12 +541,14 @@
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
 
-        // 💡 마스터 테이블에 샘플 수량 반영
-        table.innerHTML = db_master.filter(i => (i.name || "").toLowerCase().includes(search)).map(item => {
+        const sortedMasterData = [...db_master]
+            .filter(i => (i.name || "").toLowerCase().includes(search))
+            .sort((a, b) => (a.name || "").localeCompare((b.name || ""), 'ko'));
+
+        table.innerHTML = sortedMasterData.map(item => {
             const sampleQty = item.sampleQty || 0;
-            // 현재고 계산 시 판매량과 샘플출고량을 모두 뺌
             const currentStock = item.initial - item.sold - sampleQty; 
-            const salesAmount = item.sold * item.price; // 매출액은 샘플이 제외된 실제 판매량(sold)만 곱함
+            const salesAmount = item.sold * item.price; 
             dayTotalSales += salesAmount; 
 
             return `
@@ -565,7 +567,6 @@
 
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
 
-        // 판매 내역 렌더링
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -591,7 +592,6 @@
         });
         historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
 
-        // 💡 샘플 출고 내역 렌더링
         const sampleHistoryList = document.getElementById('sampleHistoryContainer');
         const groupedSample = db_sample_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -617,7 +617,6 @@
         });
         sampleHistoryList.innerHTML = sHtml || "<div style='padding:10px; text-align:center;'>샘플 출고 없음</div>";
 
-        // 입고 내역 렌더링
         const inHistoryList = document.getElementById('inHistoryContainer');
         const groupedIn = db_in_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -635,13 +634,13 @@
         });
         inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
-        const sortedItems = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
-        const optionsHtml = sortedItems.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+        const sortedItemsForDropdown = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
+        const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         
         document.getElementById('directItemSelect').innerHTML = optionsHtml;
-        document.getElementById('sampleItemSelect').innerHTML = optionsHtml; // 💡 샘플용 드롭다운도 동일하게 채움
+        document.getElementById('sampleItemSelect').innerHTML = optionsHtml; 
         
-        document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
+        document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown.map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`).join('');
     }
 
     function openMapModal() {
@@ -746,7 +745,6 @@
         }
     }
 
-    // 💡 샘플 출고 적용 함수 추가
     async function applySample() {
         const name = document.getElementById('sampleItemSelect').value;
         const qty = parseInt(document.getElementById('sampleQty').value) || 0;
@@ -815,7 +813,7 @@
         sourceArray.forEach(() => wscols.push({wch: 10})); 
         ws['!cols'] = wscols;
 
-        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약 (샘플제외)"); // 샘플은 제외되었다는 표시 추가
+        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약 (샘플제외)"); 
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 </script>
