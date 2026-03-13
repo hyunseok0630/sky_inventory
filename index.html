@@ -365,14 +365,20 @@
                 needsSave = true;
             }
 
-            // 💡 [핵심 수정] 날이 바뀌었을 때 (Daily Rollover)
-            // '어제 판매량(sold)'만 기초재고에서 차감하고 초기화합니다.
-            // '전체 날짜 샘플(sampleQty)'은 누적이므로 차감하지도 않고 초기화하지도 않습니다.
+            // 💡 [핵심 해결 로직] 날짜가 바뀌었을 때!
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { 
-                    i.initial = i.initial - i.sold; 
+                    // 어제(마지막 접속일)부터 오늘 전까지 발생한 샘플 출고량만 히스토리에서 역추적 합산
+                    const pendingSamples = db_sample_history
+                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
+                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
+
+                    // 기초 재고에 "어제 판매량"과 "어제 샘플량"만 차감시켜서 저장
+                    i.initial = i.initial - i.sold - pendingSamples; 
+                    
+                    // 판매량은 리셋
                     i.sold = 0; 
-                    // i.sampleQty는 그대로 둡니다.
+                    // i.sampleQty는 전체 누적값이므로 0으로 리셋하지 않음 (영원히 보존)
                 });
                 needsSave = true;
             }
@@ -541,14 +547,23 @@
         const table = document.getElementById('mainTable');
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
+        const todayStr = getToday();
 
         const sortedMasterData = [...db_master]
             .filter(i => (i.name || "").toLowerCase().includes(search))
             .sort((a, b) => (b.price || 0) - (a.price || 0));
 
         table.innerHTML = sortedMasterData.map(item => {
-            const sampleQty = item.sampleQty || 0;
-            const currentStock = item.initial - item.sold - sampleQty; 
+            // 표에 보여줄 숫자 (전체 누적)
+            const totalSampleQty = item.sampleQty || 0;
+            
+            // 💡 [핵심 계산 로직] 오늘 추가된 샘플 수량만 따로 계산하여 '현재고'에서만 실시간으로 빼줌
+            const todaySamplesCount = db_sample_history
+                .filter(sh => sh.name === item.name && sh.date === todayStr)
+                .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
+
+            // 현재고 계산 공식: 초기재고 - 오늘 판매량 - 오늘 나간 샘플량 (누적 샘플량인 totalSampleQty는 계산에 쓰이지 않음!)
+            const currentStock = item.initial - item.sold - todaySamplesCount; 
             const salesAmount = item.sold * item.price; 
             dayTotalSales += salesAmount; 
 
@@ -559,7 +574,7 @@
                     <td>${item.initial - (item.inQty||0)}</td>
                     <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
                     <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                    <td style="color:var(--sample); font-weight:bold;">${sampleQty}</td>
+                    <td style="color:var(--sample); font-weight:bold;">${totalSampleQty}</td>
                     <td>${currentStock}</td>
                     <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
@@ -684,7 +699,6 @@
             confirmBtn.innerText = "입고하기";
             confirmBtn.style.background = 'var(--primary)';
         } else if(mode === 'edit') {
-            // 💡 실사 조정 시에는 기준선이 초기화되므로 샘플 누적량도 0이 됩니다.
             document.getElementById('actionTitle').innerText = "✏️ 재고 수량 수정";
             document.getElementById('qtyLabel').innerText = "수정할 실재고";
             confirmBtn.innerText = "수정하기";
@@ -712,7 +726,11 @@
             db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
             db_in_history.push({ date: getToday(), name: itemName, qty: qty });
         }
-        else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; db_master[idx].sampleQty = 0; }
+        else if(currentMode === 'edit') { 
+            db_master[idx].initial = qty; 
+            db_master[idx].sold = 0; 
+            // 💡 실사조정을 해도 전체 누적 샘플 기록은 날아가지 않도록 유지합니다!
+        }
         else if(currentMode === 'del') db_master.splice(idx, 1);
         
         await saveToCloud();
