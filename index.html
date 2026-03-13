@@ -70,8 +70,6 @@
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
         
         .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
-        
-        /* 💡 검색창 및 버튼 정렬을 위한 CSS 완벽 수정 */
         .search-box { position: relative; flex: 1; max-width: 300px; display: flex; align-items: center; }
         .search-box input { padding-left: 35px; margin: 0; border-color: var(--primary); height: 40px; box-sizing: border-box; }
         .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; }
@@ -119,7 +117,7 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">샘플(일)</th><th>현재고</th><th>매출액</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">전체 날짜 샘플</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
@@ -541,9 +539,10 @@
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
 
+        // 💡 단가(price) 기준 내림차순 정렬 적용
         const sortedMasterData = [...db_master]
             .filter(i => (i.name || "").toLowerCase().includes(search))
-            .sort((a, b) => (a.name || "").localeCompare((b.name || ""), 'ko'));
+            .sort((a, b) => (b.price || 0) - (a.price || 0));
 
         table.innerHTML = sortedMasterData.map(item => {
             const sampleQty = item.sampleQty || 0;
@@ -634,6 +633,7 @@
         });
         inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
+        // 💡 드롭다운과 체크박스용 아이템은 입력하기 쉽게 기존 가나다순 유지!
         const sortedItemsForDropdown = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
         const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         
