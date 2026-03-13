@@ -117,7 +117,7 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">나가 있는 샘플 수</th><th>현재고</th><th>매출액</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
@@ -558,9 +558,8 @@
             .filter(i => (i.name || "").toLowerCase().includes(search))
             .sort((a, b) => (b.price || 0) - (a.price || 0));
 
+        // 💡 4번 표 렌더링 수정 (샘플 수 칸 삭제)
         table.innerHTML = sortedMasterData.map(item => {
-            const totalSampleQty = item.sampleQty || 0;
-            
             const todaySamplesCount = db_sample_history
                 .filter(sh => sh.name === item.name && sh.date === todayStr)
                 .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
@@ -576,7 +575,6 @@
                     <td>${item.initial - (item.inQty||0)}</td>
                     <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
                     <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                    <td style="color:var(--sample); font-weight:bold;">${totalSampleQty}</td>
                     <td>${currentStock}</td>
                     <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
@@ -610,14 +608,13 @@
         });
         historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
 
-        // 💡 [핵심 해결] 출고와 반납이 같은 날 있어도 상쇄되어 사라지지 않도록 분리하여 기록
         const sampleHistoryList = document.getElementById('sampleHistoryContainer');
         const groupedSample = db_sample_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
             const safeName = obj.name || '알수없음';
             acc[obj.date][safeName] = acc[obj.date][safeName] || {};
             let dest = obj.dest || '기타';
-            let type = obj.qty > 0 ? 'out' : 'in'; // 출고(+)와 반납(-)을 분리
+            let type = obj.qty > 0 ? 'out' : 'in';
             let key = dest + '|||' + type; 
             acc[obj.date][safeName][key] = (acc[obj.date][safeName][key] || 0) + obj.qty;
             return acc; 
@@ -638,7 +635,6 @@
                     tags += `<span class="source-tag" style="${tagStyle}">${dest} ${qText}</span>`;
                 });
                 if (total !== 0 || tags !== "") {
-                    // 총합의 상태에 따라 색상 및 텍스트 변경
                     let totalStyle = total < 0 ? `color:var(--primary);` : (total > 0 ? `color:var(--sample);` : `color:#888;`);
                     let totalText = total < 0 ? `순반납 ${-total}` : (total > 0 ? `순출고 ${total}` : `변동 0`);
                     sHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="${totalStyle} white-space:nowrap;">${totalText}</b></div><div class="history-sales-tags">${tags}</div></div>`;
@@ -867,13 +863,11 @@
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 
-    // 💡 [신규 추가] 미반납 샘플 전용 엑셀 다운로드 기능
     function exportSampleExcel() {
         if(db_sample_history.length === 0) return alert("샘플 출고/반납 내역이 없습니다.");
 
         const summary = {};
         
-        // 전체 샘플 내역(출고+, 반납-)을 업체별로 전부 합산
         db_sample_history.forEach(row => {
             const name = row.name;
             const dest = row.dest || "기타";
@@ -888,7 +882,6 @@
         Object.keys(summary).sort().forEach(name => {
             Object.keys(summary[name]).sort().forEach(dest => {
                 const remain = summary[name][dest];
-                // 최종적으로 0보다 큰(아직 반납 안된) 수량만 추출
                 if (remain > 0) {
                     excelData.push({
                         "품목명": name,
