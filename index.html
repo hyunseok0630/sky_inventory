@@ -7,7 +7,16 @@
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
-        .container { max-width: 1400px; margin: 0 auto; }
+        .container { max-width: 1400px; margin: 0 auto; display: none; } /* 처음엔 컨테이너 숨김 */
+        
+        /* 💡 로그인(보안) 화면 스타일 추가 */
+        #loginOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:var(--secondary); z-index:9000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; }
+        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; color: #333; width: 300px; }
+        .login-box h2 { margin-top: 0; color: var(--secondary); margin-bottom: 20px; }
+        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; text-align: center; box-sizing: border-box; }
+        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .login-box button:hover { background: #02b04e; }
+        
         #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
         
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
@@ -47,10 +56,8 @@
         .history-sales-header { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
         .history-sales-tags { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; justify-content: flex-end; }
         
-        /* 모든 태그 공통 디자인 */
         .source-tag { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #ced4da; background: #f8f9fa; color: #495057; }
         
-        /* 지정 판매처별 포인트 색상 */
         .tag-세미트론 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
@@ -78,9 +85,18 @@
 </head>
 <body>
 
+<div id="loginOverlay">
+    <div class="login-box">
+        <h2>🔒 시스템 접속</h2>
+        <p style="font-size:13px; color:#666; margin-bottom:20px;">시스템에 접근하려면 비밀번호를 입력하세요.</p>
+        <input type="password" id="loginPin" placeholder="비밀번호 입력" onkeypress="if(event.keyCode===13) checkLogin()">
+        <button onclick="checkLogin()">로그인</button>
+    </div>
+</div>
+
 <div id="loadingOverlay">☁️ 데이터를 동기화하고 있습니다...</div>
 
-<div class="container">
+<div class="container" id="mainContainer">
     <div class="backup-group">
         <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
         <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침</button>
@@ -215,6 +231,7 @@
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
     let backup_state = null;
+    let authPin = ""; // 접속용 핀번호 저장 변수
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
@@ -241,6 +258,16 @@
         document.getElementById('undoBtn').disabled = false;
     }
 
+    // 💡 로그인 검증 함수 추가
+    function checkLogin() {
+        const inputPin = document.getElementById('loginPin').value;
+        if(!inputPin) { alert("비밀번호를 입력하세요."); return; }
+        authPin = inputPin;
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainContainer').style.display = 'block';
+        loadFromCloud(); // 로그인 시도 시 구글 서버 호출
+    }
+
     async function undoLastAction() {
         if (!backup_state) return;
         toggleLoading(true);
@@ -253,17 +280,20 @@
         document.getElementById('undoBtn').disabled = true;
         
         try {
-            await fetch(G_SCRIPT_URL, { 
+            const resp = await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
+            const result = await resp.json();
+            if(result.error) throw new Error(result.error);
+            
             addLog("⚠️ 방금 전 1건의 작업이 정확히 취소(되돌리기) 되었습니다.", "warning");
             render();
         } catch (e) {
-            addLog("되돌리기 상태 저장에 실패했습니다.", "danger");
+            addLog("되돌리기 실패: " + e.message, "danger");
         }
         toggleLoading(false);
     }
@@ -271,8 +301,20 @@
     async function loadFromCloud() {
         toggleLoading(true);
         try {
-            const resp = await fetch(G_SCRIPT_URL);
+            // 💡 구글 호출 시 비밀번호(PIN)를 함께 보냅니다.
+            const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime() + "&pin=" + authPin;
+            const resp = await fetch(fetchUrl);
             const data = await resp.json();
+            
+            if(data.error) {
+                // 비밀번호가 틀리면 다시 숨기고 에러 표시
+                document.getElementById('mainContainer').style.display = 'none';
+                document.getElementById('loginOverlay').style.display = 'flex';
+                document.getElementById('loginPin').value = '';
+                alert(data.error);
+                toggleLoading(false);
+                return;
+            }
             
             db_master = data.master || [];
             db_map = (data.map || []).map(m => {
@@ -315,22 +357,29 @@
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
             render();
-        } catch (e) { addLog("데이터 연동 오류!", "danger"); }
+        } catch (e) { 
+            document.getElementById('mainContainer').style.display = 'none';
+            document.getElementById('loginOverlay').style.display = 'flex';
+            alert("서버 연결에 실패했습니다.");
+        }
         toggleLoading(false);
     }
 
     async function saveToCloud() {
         toggleLoading(true);
         try {
-            await fetch(G_SCRIPT_URL, { 
+            // 💡 저장할 때도 비밀번호(PIN)를 동봉합니다.
+            const resp = await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
+            const result = await resp.json();
+            if(result.error) throw new Error(result.error);
             render();
-        } catch (e) { addLog("구글 시트 저장 실패", "danger"); }
+        } catch (e) { addLog("구글 시트 저장 실패: " + e.message, "danger"); }
         toggleLoading(false);
     }
 
@@ -698,7 +747,7 @@
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 
-    loadFromCloud();
+    // 초기 실행은 이제 checkLogin()이 담당하므로 loadFromCloud()를 직접 호출하지 않습니다.
 </script>
 </body>
 </html>
