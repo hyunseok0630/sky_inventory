@@ -117,7 +117,7 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">전체 날짜 샘플</th><th>현재고</th><th>매출액</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">나가 있는 샘플 수</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
@@ -167,7 +167,15 @@
                     <select id="sampleItemSelect" style="flex:2;"></select>
                     <input type="number" id="sampleQty" value="1" min="1" style="flex:1;">
                     <input type="text" id="sampleDest" placeholder="제공처 수기입력" style="flex:1.5;">
-                    <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">반영</button>
+                    <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">출고</button>
+                </div>
+
+                <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:13px; margin-top:10px;">🔄 샘플 반납 (나가있는샘플 차감/재고회복)</div>
+                <div class="action-row">
+                    <select id="sampleInItemSelect" style="flex:2;"></select>
+                    <input type="number" id="sampleInQty" value="1" min="1" style="flex:1;">
+                    <input type="text" id="sampleInDest" placeholder="반납처/사유 (선택)" style="flex:1.5;">
+                    <button class="btn" style="background:var(--primary); color:white; flex:1;" onclick="applySampleIn()">반납</button>
                 </div>
                 
                 <div id="actionLog" class="log-area">
@@ -186,7 +194,10 @@
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
-                    <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">판매내역 엑셀다운</button>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn" style="background:var(--sample); color:white; font-size:12px;" onclick="exportSampleExcel()">샘플내역 엑셀다운</button>
+                        <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">판매내역 엑셀다운</button>
+                    </div>
                 </div>
                 
                 <div class="history-layout">
@@ -195,12 +206,12 @@
                         <div id="historyContainer" class="history-list"></div>
                     </div>
                     <div>
-                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 출고 내역</div>
-                        <div id="sampleHistoryContainer" class="history-list"></div>
-                    </div>
-                    <div>
                         <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">📦 입고 내역</div>
                         <div id="inHistoryContainer" class="history-list"></div>
+                    </div>
+                    <div>
+                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 출고/반납 내역</div>
+                        <div id="sampleHistoryContainer" class="history-list"></div>
                     </div>
                 </div>
             </div>
@@ -365,20 +376,14 @@
                 needsSave = true;
             }
 
-            // 💡 [핵심 해결 로직] 날짜가 바뀌었을 때!
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => { 
-                    // 어제(마지막 접속일)부터 오늘 전까지 발생한 샘플 출고량만 히스토리에서 역추적 합산
                     const pendingSamples = db_sample_history
                         .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
                         .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
 
-                    // 기초 재고에 "어제 판매량"과 "어제 샘플량"만 차감시켜서 저장
                     i.initial = i.initial - i.sold - pendingSamples; 
-                    
-                    // 판매량은 리셋
                     i.sold = 0; 
-                    // i.sampleQty는 전체 누적값이므로 0으로 리셋하지 않음 (영원히 보존)
                 });
                 needsSave = true;
             }
@@ -554,15 +559,12 @@
             .sort((a, b) => (b.price || 0) - (a.price || 0));
 
         table.innerHTML = sortedMasterData.map(item => {
-            // 표에 보여줄 숫자 (전체 누적)
             const totalSampleQty = item.sampleQty || 0;
             
-            // 💡 [핵심 계산 로직] 오늘 추가된 샘플 수량만 따로 계산하여 '현재고'에서만 실시간으로 빼줌
             const todaySamplesCount = db_sample_history
                 .filter(sh => sh.name === item.name && sh.date === todayStr)
                 .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
 
-            // 현재고 계산 공식: 초기재고 - 오늘 판매량 - 오늘 나간 샘플량 (누적 샘플량인 totalSampleQty는 계산에 쓰이지 않음!)
             const currentStock = item.initial - item.sold - todaySamplesCount; 
             const salesAmount = item.sold * item.price; 
             dayTotalSales += salesAmount; 
@@ -608,13 +610,16 @@
         });
         historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
 
+        // 💡 [핵심 해결] 출고와 반납이 같은 날 있어도 상쇄되어 사라지지 않도록 분리하여 기록
         const sampleHistoryList = document.getElementById('sampleHistoryContainer');
         const groupedSample = db_sample_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
             const safeName = obj.name || '알수없음';
             acc[obj.date][safeName] = acc[obj.date][safeName] || {};
             let dest = obj.dest || '기타';
-            acc[obj.date][safeName][dest] = (acc[obj.date][safeName][dest] || 0) + obj.qty;
+            let type = obj.qty > 0 ? 'out' : 'in'; // 출고(+)와 반납(-)을 분리
+            let key = dest + '|||' + type; 
+            acc[obj.date][safeName][key] = (acc[obj.date][safeName][key] || 0) + obj.qty;
             return acc; 
         }, {});
 
@@ -623,15 +628,25 @@
             sHtml += `<div class="history-day history-day-sample"><div class="history-date">${date}</div>`;
             Object.keys(groupedSample[date]).forEach(name => {
                 let total = 0, tags = "";
-                Object.keys(groupedSample[date][name]).forEach(dest => {
-                    total += groupedSample[date][name][dest];
-                    tags += `<span class="source-tag" style="background:#f5eef8; color:var(--sample); border-color:#d7bde2;">${dest} ${groupedSample[date][name][dest]}</span>`;
+                Object.keys(groupedSample[date][name]).forEach(key => {
+                    let q = groupedSample[date][name][key];
+                    if (q === 0) return; 
+                    total += q;
+                    let dest = key.split('|||')[0];
+                    let tagStyle = q < 0 ? `background:#e8f5e9; color:var(--primary); border-color:#c8e6c9;` : `background:#f5eef8; color:var(--sample); border-color:#d7bde2;`;
+                    let qText = q < 0 ? `반납 ${-q}` : `출고 ${q}`;
+                    tags += `<span class="source-tag" style="${tagStyle}">${dest} ${qText}</span>`;
                 });
-                sHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="color:var(--sample); white-space:nowrap;">총 ${total}</b></div><div class="history-sales-tags">${tags}</div></div>`;
+                if (total !== 0 || tags !== "") {
+                    // 총합의 상태에 따라 색상 및 텍스트 변경
+                    let totalStyle = total < 0 ? `color:var(--primary);` : (total > 0 ? `color:var(--sample);` : `color:#888;`);
+                    let totalText = total < 0 ? `순반납 ${-total}` : (total > 0 ? `순출고 ${total}` : `변동 0`);
+                    sHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="${totalStyle} white-space:nowrap;">${totalText}</b></div><div class="history-sales-tags">${tags}</div></div>`;
+                }
             });
             sHtml += `</div>`;
         });
-        sampleHistoryList.innerHTML = sHtml || "<div style='padding:10px; text-align:center;'>샘플 출고 없음</div>";
+        sampleHistoryList.innerHTML = sHtml || "<div style='padding:10px; text-align:center;'>샘플 출고/반납 내역 없음</div>";
 
         const inHistoryList = document.getElementById('inHistoryContainer');
         const groupedIn = db_in_history.reduce((acc, obj) => { 
@@ -655,6 +670,7 @@
         
         document.getElementById('directItemSelect').innerHTML = optionsHtml;
         document.getElementById('sampleItemSelect').innerHTML = optionsHtml; 
+        document.getElementById('sampleInItemSelect').innerHTML = optionsHtml; 
         
         document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown.map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`).join('');
     }
@@ -729,7 +745,6 @@
         else if(currentMode === 'edit') { 
             db_master[idx].initial = qty; 
             db_master[idx].sold = 0; 
-            // 💡 실사조정을 해도 전체 누적 샘플 기록은 날아가지 않도록 유지합니다!
         }
         else if(currentMode === 'del') db_master.splice(idx, 1);
         
@@ -777,6 +792,21 @@
             db_sample_history.push({ date: getToday(), name: name, qty: qty, dest: dest }); 
             await saveToCloud(); 
             addLog(`🎁 샘플 출고: ${name} ${qty}개 (${dest})`, "info"); 
+        }
+    }
+
+    async function applySampleIn() {
+        const name = document.getElementById('sampleInItemSelect').value;
+        const qty = parseInt(document.getElementById('sampleInQty').value) || 0;
+        const dest = document.getElementById('sampleInDest').value.trim() || "기타(반납)";
+        
+        const item = db_master.find(i => i.name === name);
+        if(item) { 
+            saveStateForUndo(); 
+            item.sampleQty = (item.sampleQty || 0) - qty; 
+            db_sample_history.push({ date: getToday(), name: name, qty: -qty, dest: dest }); 
+            await saveToCloud(); 
+            addLog(`🔄 샘플 반납: ${name} ${qty}개 (${dest})`, "success"); 
         }
     }
 
@@ -835,6 +865,50 @@
 
         XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약 (샘플제외)"); 
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
+    }
+
+    // 💡 [신규 추가] 미반납 샘플 전용 엑셀 다운로드 기능
+    function exportSampleExcel() {
+        if(db_sample_history.length === 0) return alert("샘플 출고/반납 내역이 없습니다.");
+
+        const summary = {};
+        
+        // 전체 샘플 내역(출고+, 반납-)을 업체별로 전부 합산
+        db_sample_history.forEach(row => {
+            const name = row.name;
+            const dest = row.dest || "기타";
+            const qty = parseInt(row.qty) || 0;
+            
+            if (!summary[name]) summary[name] = {};
+            if (!summary[name][dest]) summary[name][dest] = 0;
+            summary[name][dest] += qty;
+        });
+
+        const excelData = [];
+        Object.keys(summary).sort().forEach(name => {
+            Object.keys(summary[name]).sort().forEach(dest => {
+                const remain = summary[name][dest];
+                // 최종적으로 0보다 큰(아직 반납 안된) 수량만 추출
+                if (remain > 0) {
+                    excelData.push({
+                        "품목명": name,
+                        "제공처/업체명": dest,
+                        "미반납 수량": remain
+                    });
+                }
+            });
+        });
+
+        if (excelData.length === 0) return alert("현재 미반납된(나가있는) 샘플이 없습니다. 모두 반납 완료되었습니다!");
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(excelData);
+
+        const wscols = [{wch: 35}, {wch: 25}, {wch: 15}];
+        ws['!cols'] = wscols;
+
+        XLSX.utils.book_append_sheet(wb, ws, "미반납 샘플 현황"); 
+        XLSX.writeFile(wb, `SKY_미반납샘플현황_${getToday()}.xlsx`);
     }
 </script>
 </body>
