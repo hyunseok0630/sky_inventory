@@ -7,9 +7,8 @@
     <style>
         :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
-        .container { max-width: 1400px; margin: 0 auto; display: none; } /* 처음엔 컨테이너 숨김 */
+        .container { max-width: 1400px; margin: 0 auto; display: none; }
         
-        /* 💡 로그인(보안) 화면 스타일 추가 */
         #loginOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:var(--secondary); z-index:9000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; }
         .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; color: #333; width: 300px; }
         .login-box h2 { margin-top: 0; color: var(--secondary); margin-bottom: 20px; }
@@ -57,7 +56,6 @@
         .history-sales-tags { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; justify-content: flex-end; }
         
         .source-tag { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #ced4da; background: #f8f9fa; color: #495057; }
-        
         .tag-세미트론 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
@@ -227,11 +225,12 @@
 </div>
 
 <script>
+    // 💡 스크립트 URL은 기존과 동일하게 유지
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScq_LKH2f3kwLOX_Aeal/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [];
     let backup_state = null;
-    let authPin = ""; // 접속용 핀번호 저장 변수
+    let authPin = ""; 
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
     function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
@@ -258,14 +257,13 @@
         document.getElementById('undoBtn').disabled = false;
     }
 
-    // 💡 로그인 검증 함수 추가
     function checkLogin() {
         const inputPin = document.getElementById('loginPin').value;
         if(!inputPin) { alert("비밀번호를 입력하세요."); return; }
         authPin = inputPin;
         document.getElementById('loginOverlay').style.display = 'none';
         document.getElementById('mainContainer').style.display = 'block';
-        loadFromCloud(); // 로그인 시도 시 구글 서버 호출
+        loadFromCloud(); 
     }
 
     async function undoLastAction() {
@@ -301,17 +299,15 @@
     async function loadFromCloud() {
         toggleLoading(true);
         try {
-            // 💡 구글 호출 시 비밀번호(PIN)를 함께 보냅니다.
             const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime() + "&pin=" + authPin;
             const resp = await fetch(fetchUrl);
             const data = await resp.json();
             
             if(data.error) {
-                // 비밀번호가 틀리면 다시 숨기고 에러 표시
                 document.getElementById('mainContainer').style.display = 'none';
                 document.getElementById('loginOverlay').style.display = 'flex';
                 document.getElementById('loginPin').value = '';
-                alert(data.error);
+                alert("⚠️ " + data.error);
                 toggleLoading(false);
                 return;
             }
@@ -360,7 +356,8 @@
         } catch (e) { 
             document.getElementById('mainContainer').style.display = 'none';
             document.getElementById('loginOverlay').style.display = 'flex';
-            alert("서버 연결에 실패했습니다.");
+            alert("서버 연결 실패!\n1. 앱스 스크립트 '새 버전 배포'를 다시 확인해주세요.\n2. 콘솔창에 자세한 에러가 있습니다.");
+            console.error(e);
         }
         toggleLoading(false);
     }
@@ -368,7 +365,6 @@
     async function saveToCloud() {
         toggleLoading(true);
         try {
-            // 💡 저장할 때도 비밀번호(PIN)를 동봉합니다.
             const resp = await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
@@ -514,7 +510,8 @@
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
 
-        table.innerHTML = db_master.filter(i => i.name.toLowerCase().includes(search)).map(item => {
+        // 💡 텅 빈 이름이 들어가 있을 경우 발생하는 toLowerCase 에러 완벽 방어
+        table.innerHTML = db_master.filter(i => (i.name || "").toLowerCase().includes(search)).map(item => {
             const currentStock = item.initial - item.sold; 
             const salesAmount = item.sold * item.price;
             dayTotalSales += salesAmount; 
@@ -584,7 +581,7 @@
         inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
         document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-        const sortedItems = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
+        const sortedItems = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
         document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
     }
 
@@ -616,7 +613,7 @@
         currentMode = mode;
         closeMgmtModal();
         const select = document.getElementById('actionItemSelect');
-        const sorted = [...db_master].sort((a,b) => a.name.localeCompare(b.name, 'ko'));
+        const sorted = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
         select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
         document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
@@ -746,8 +743,6 @@
         XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약");
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
-
-    // 초기 실행은 이제 checkLogin()이 담당하므로 loadFromCloud()를 직접 호출하지 않습니다.
 </script>
 </body>
 </html>
