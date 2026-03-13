@@ -5,7 +5,7 @@
     <title>SKY Commerce - Smart Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; }
+        :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; --sample: #8e44ad; }
         body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
         .container { max-width: 1400px; margin: 0 auto; display: none; }
         
@@ -21,12 +21,12 @@
         .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
         .btn-backup { background: #636e72; color: white; padding: 8px 12px; font-size: 12px; border-radius: 6px; border:none; cursor:pointer; }
         
-        .main-layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 20px; align-items: start; }
+        .main-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }
         .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
         h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
         
         table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; }
-        th, td { border: 1px solid var(--border); padding: 12px 8px; text-align: center; }
+        th, td { border: 1px solid var(--border); padding: 10px 6px; text-align: center; font-size: 14px; }
         th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
         
         .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
@@ -35,19 +35,18 @@
         .chk-item { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; }
         .chk-item:hover { background: #f8f9fa; }
         .chk-item span { font-size: 14px; flex: 1; text-align: left; margin-right: 15px; word-break: keep-all; line-height: 1.4; }
-        .chk-item input[type="checkbox"] { width: 18px; height: 18px; margin: 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
-
+        
         .log-area { margin-top: 15px; padding: 10px; background: #2d3436; color: #dfe6e9; border-radius: 6px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; line-height: 1.6; }
         .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
-        .log-warning { color: #fdcb6e; }
         
         .history-layout { display: flex; flex-direction: column; gap: 20px; }
         .history-list { max-height: 350px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
         .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
         .history-day-in { border-left-color: var(--accent); }
+        .history-day-sample { border-left-color: var(--sample); }
         .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
         
         .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
@@ -66,7 +65,7 @@
         .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
-        .action-row { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        .action-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
         .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
         
         .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
@@ -117,7 +116,7 @@
                 </div>
                 <table>
                     <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th>현재고</th><th>매출액</th></tr>
+                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th style="color:var(--sample);">샘플(일)</th><th>현재고</th><th>매출액</th></tr>
                     </thead>
                     <tbody id="mainTable"></tbody>
                 </table>
@@ -137,11 +136,12 @@
 
         <div class="right-panel">
             <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h3 style="margin:0; border:none;">3. 판매 데이터 적용</h3>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h3 style="margin:0; border:none;">3. 판매 및 샘플 반영</h3>
                     <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>↩️ 방금 전 되돌리기</button>
                 </div>
                 
+                <div style="font-weight:bold; color:var(--point); margin-bottom:8px; font-size:13px;">🛒 판매 반영 (매출포함/재고차감)</div>
                 <div class="action-row">
                     <select id="directItemSelect" style="flex:2;"></select>
                     <input type="number" id="directQty" value="1" min="1" style="flex:1;">
@@ -155,8 +155,18 @@
                     <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
                 </div>
                 <div class="action-row">
-                    <input type="file" id="exFile" accept=".xlsx, .xls">
-                    <button class="btn" style="background:var(--secondary); color:white;" onclick="loadExcel()">엑셀반영</button>
+                    <input type="file" id="exFile" accept=".xlsx, .xls" style="flex:3;">
+                    <button class="btn" style="background:var(--secondary); color:white; flex:1;" onclick="loadExcel()">엑셀 일괄반영</button>
+                </div>
+
+                <hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">
+
+                <div style="font-weight:bold; color:var(--sample); margin-bottom:8px; font-size:13px;">🎁 샘플 출고 (매출제외/재고차감)</div>
+                <div class="action-row">
+                    <select id="sampleItemSelect" style="flex:2;"></select>
+                    <input type="number" id="sampleQty" value="1" min="1" style="flex:1;">
+                    <input type="text" id="sampleDest" placeholder="제공처 수기입력" style="flex:1.5;">
+                    <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">반영</button>
                 </div>
                 
                 <div id="actionLog" class="log-area">
@@ -175,13 +185,17 @@
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
-                    <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">이번달 판매내역 엑셀저장</button>
+                    <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">판매내역 엑셀다운</button>
                 </div>
                 
                 <div class="history-layout">
                     <div>
                         <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
                         <div id="historyContainer" class="history-list"></div>
+                    </div>
+                    <div>
+                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 출고 내역</div>
+                        <div id="sampleHistoryContainer" class="history-list"></div>
                     </div>
                     <div>
                         <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">📦 입고 내역</div>
@@ -225,10 +239,10 @@
 </div>
 
 <script>
-    // 💡 스크립트 URL은 기존과 동일하게 유지
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScq_LKH2f3kwLOX_Aeal/exec";
     
-    let db_master = [], db_map = [], db_history = [], db_in_history = [];
+    // 💡 샘플 히스토리 배열 추가
+    let db_master = [], db_map = [], db_history = [], db_in_history = [], db_sample_history = [];
     let backup_state = null;
     let authPin = ""; 
 
@@ -252,6 +266,7 @@
             master: JSON.parse(JSON.stringify(db_master)), 
             history: JSON.parse(JSON.stringify(db_history)),
             inHistory: JSON.parse(JSON.stringify(db_in_history)),
+            sampleHistory: JSON.parse(JSON.stringify(db_sample_history)),
             map: JSON.parse(JSON.stringify(db_map))
         };
         document.getElementById('undoBtn').disabled = false;
@@ -272,6 +287,7 @@
         db_master = backup_state.master;
         db_history = backup_state.history;
         db_in_history = backup_state.inHistory;
+        db_sample_history = backup_state.sampleHistory;
         db_map = backup_state.map;
         
         backup_state = null;
@@ -281,7 +297,7 @@
             const resp = await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sampleHistory: db_sample_history,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
@@ -332,6 +348,13 @@
                 if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
                 return { ...h, date: d };
             });
+
+            // 💡 샘플 내역 불러오기
+            db_sample_history = (data.sampleHistory || []).map(h => {
+                let d = h.date || getToday();
+                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
+                return { ...h, date: d, name: h.name || '알수없음' };
+            });
             
             const today = getToday();
             const currentMonth = getCurrentMonth();
@@ -343,8 +366,13 @@
                 needsSave = true;
             }
 
+            // 💡 날이 바뀌면 전날의 판매량과 '샘플출고량'을 모두 기초재고에서 완전히 빼고 리셋함
             if (data.lastDate && data.lastDate < today) {
-                db_master.forEach(i => { i.initial = i.initial - i.sold; i.sold = 0; });
+                db_master.forEach(i => { 
+                    i.initial = i.initial - i.sold - (i.sampleQty || 0); 
+                    i.sold = 0; 
+                    i.sampleQty = 0; 
+                });
                 needsSave = true;
             }
 
@@ -368,7 +396,7 @@
             const resp = await fetch(G_SCRIPT_URL, { 
                 method: "POST", 
                 body: JSON.stringify({ 
-                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history,
+                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sampleHistory: db_sample_history,
                     lastDate: getToday(), lastMonth: getCurrentMonth() 
                 })
             });
@@ -431,6 +459,7 @@
                 let snapshot_master = JSON.parse(JSON.stringify(db_master));
                 let snapshot_history = JSON.parse(JSON.stringify(db_history));
                 let snapshot_in_history = JSON.parse(JSON.stringify(db_in_history));
+                let snapshot_sample_history = JSON.parse(JSON.stringify(db_sample_history));
                 let snapshot_map = JSON.parse(JSON.stringify(db_map));
 
                 for (let i = headerRowIdx + 1; i < rawData.length; i++) {
@@ -475,6 +504,7 @@
                         master: snapshot_master, 
                         history: snapshot_history,
                         inHistory: snapshot_in_history,
+                        sampleHistory: snapshot_sample_history,
                         map: snapshot_map
                     };
                     document.getElementById('undoBtn').disabled = false;
@@ -485,6 +515,7 @@
                     db_master = snapshot_master;
                     db_history = snapshot_history;
                     db_in_history = snapshot_in_history;
+                    db_sample_history = snapshot_sample_history;
                     db_map = snapshot_map;
                     addLog(`반영 0건. 미매칭 내역을 확인해주세요. (읽은 줄수: ${parsedRows})`, "warning");
                 }
@@ -510,10 +541,12 @@
         const search = document.getElementById('inventorySearch').value.toLowerCase();
         let dayTotalSales = 0; 
 
-        // 💡 텅 빈 이름이 들어가 있을 경우 발생하는 toLowerCase 에러 완벽 방어
+        // 💡 마스터 테이블에 샘플 수량 반영
         table.innerHTML = db_master.filter(i => (i.name || "").toLowerCase().includes(search)).map(item => {
-            const currentStock = item.initial - item.sold; 
-            const salesAmount = item.sold * item.price;
+            const sampleQty = item.sampleQty || 0;
+            // 현재고 계산 시 판매량과 샘플출고량을 모두 뺌
+            const currentStock = item.initial - item.sold - sampleQty; 
+            const salesAmount = item.sold * item.price; // 매출액은 샘플이 제외된 실제 판매량(sold)만 곱함
             dayTotalSales += salesAmount; 
 
             return `
@@ -523,6 +556,7 @@
                     <td>${item.initial - (item.inQty||0)}</td>
                     <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
                     <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
+                    <td style="color:var(--sample); font-weight:bold;">${sampleQty}</td>
                     <td>${currentStock}</td>
                     <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
@@ -531,6 +565,7 @@
 
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
 
+        // 판매 내역 렌더링
         const historyList = document.getElementById('historyContainer');
         const grouped = db_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -550,19 +585,39 @@
                     total += grouped[date][name][src];
                     tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span>`;
                 });
-                
-                hHtml += `<div class="history-sales-row">
-                            <div class="history-sales-header">
-                                <span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span>
-                                <b style="color:var(--secondary); white-space:nowrap;">총 ${total}</b>
-                            </div>
-                            <div class="history-sales-tags">${tags}</div>
-                          </div>`;
+                hHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="color:var(--secondary); white-space:nowrap;">총 ${total}</b></div><div class="history-sales-tags">${tags}</div></div>`;
             });
             hHtml += `</div>`;
         });
         historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
 
+        // 💡 샘플 출고 내역 렌더링
+        const sampleHistoryList = document.getElementById('sampleHistoryContainer');
+        const groupedSample = db_sample_history.reduce((acc, obj) => { 
+            acc[obj.date] = acc[obj.date] || {};
+            const safeName = obj.name || '알수없음';
+            acc[obj.date][safeName] = acc[obj.date][safeName] || {};
+            let dest = obj.dest || '기타';
+            acc[obj.date][safeName][dest] = (acc[obj.date][safeName][dest] || 0) + obj.qty;
+            return acc; 
+        }, {});
+
+        let sHtml = "";
+        Object.keys(groupedSample).sort().reverse().forEach(date => {
+            sHtml += `<div class="history-day history-day-sample"><div class="history-date">${date}</div>`;
+            Object.keys(groupedSample[date]).forEach(name => {
+                let total = 0, tags = "";
+                Object.keys(groupedSample[date][name]).forEach(dest => {
+                    total += groupedSample[date][name][dest];
+                    tags += `<span class="source-tag" style="background:#f5eef8; color:var(--sample); border-color:#d7bde2;">${dest} ${groupedSample[date][name][dest]}</span>`;
+                });
+                sHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="color:var(--sample); white-space:nowrap;">총 ${total}</b></div><div class="history-sales-tags">${tags}</div></div>`;
+            });
+            sHtml += `</div>`;
+        });
+        sampleHistoryList.innerHTML = sHtml || "<div style='padding:10px; text-align:center;'>샘플 출고 없음</div>";
+
+        // 입고 내역 렌더링
         const inHistoryList = document.getElementById('inHistoryContainer');
         const groupedIn = db_in_history.reduce((acc, obj) => { 
             acc[obj.date] = acc[obj.date] || {};
@@ -580,8 +635,12 @@
         });
         inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
 
-        document.getElementById('directItemSelect').innerHTML = db_master.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
         const sortedItems = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
+        const optionsHtml = sortedItems.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
+        
+        document.getElementById('directItemSelect').innerHTML = optionsHtml;
+        document.getElementById('sampleItemSelect').innerHTML = optionsHtml; // 💡 샘플용 드롭다운도 동일하게 채움
+        
         document.getElementById('itemChecks').innerHTML = sortedItems.map(i => `<label class="chk-item"><span>${i.name}</span><input type="checkbox" class="chk" value="${i.name}"></label>`).join('');
     }
 
@@ -652,7 +711,7 @@
             db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
             db_in_history.push({ date: getToday(), name: itemName, qty: qty });
         }
-        else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; }
+        else if(currentMode === 'edit') { db_master[idx].initial = qty; db_master[idx].sold = 0; db_master[idx].sampleQty = 0; }
         else if(currentMode === 'del') db_master.splice(idx, 1);
         
         await saveToCloud();
@@ -666,7 +725,7 @@
         
         saveStateForUndo(); 
 
-        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0 });
+        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0, sampleQty: 0 });
         await saveToCloud();
         addLog(`신규 등록: ${name}`, "info");
         document.getElementById('mName').value = "";
@@ -683,7 +742,23 @@
             item.sold += qty; 
             addHistory(name, qty, source); 
             await saveToCloud(); 
-            addLog(`${source} 반영: ${name} ${qty}개`, "success"); 
+            addLog(`🛒 판매 반영: ${name} ${qty}개 (${source})`, "success"); 
+        }
+    }
+
+    // 💡 샘플 출고 적용 함수 추가
+    async function applySample() {
+        const name = document.getElementById('sampleItemSelect').value;
+        const qty = parseInt(document.getElementById('sampleQty').value) || 0;
+        const dest = document.getElementById('sampleDest').value.trim() || "기타(미상)";
+        
+        const item = db_master.find(i => i.name === name);
+        if(item) { 
+            saveStateForUndo(); 
+            item.sampleQty = (item.sampleQty || 0) + qty; 
+            db_sample_history.push({ date: getToday(), name: name, qty: qty, dest: dest }); 
+            await saveToCloud(); 
+            addLog(`🎁 샘플 출고: ${name} ${qty}개 (${dest})`, "info"); 
         }
     }
 
@@ -740,7 +815,7 @@
         sourceArray.forEach(() => wscols.push({wch: 10})); 
         ws['!cols'] = wscols;
 
-        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약");
+        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약 (샘플제외)"); // 샘플은 제외되었다는 표시 추가
         XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
     }
 </script>
