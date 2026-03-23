@@ -64,6 +64,8 @@
         .tag-라운즈 { background: #e0f2f1; color: #00796b; border-color: #b2dfdb; }
         /* 💡 금양 전용 색상 태그 추가 */
         .tag-금양 { background: #fff8e1; color: #f57f17; border-color: #ffecb3; }
+        /* 💡 GS 전용 색상 태그 추가 */
+        .tag-GS { background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }
         .tag-기타 { background: #f1f3f5; color: #495057; border-color: #ced4da; }
 
         input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
@@ -158,6 +160,7 @@
                         <option value="SSG">SSG</option>
                         <option value="라운즈">라운즈</option>
                         <option value="금양">금양</option>
+                        <option value="GS">GS</option>
                         <option value="기타">기타</option>
                     </select>
                     <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
@@ -434,7 +437,8 @@
         let source = "기타";
         const fileName = file.name;
         
-        if(fileName.includes("DeliveryList")) source = "쿠팡";
+        if(fileName.startsWith("직송주문")) source = "GS";
+        else if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
         else if(fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
 
