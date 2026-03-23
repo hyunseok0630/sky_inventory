@@ -437,7 +437,7 @@
         let source = "기타";
         const fileName = file.name;
         
-        if(fileName.startsWith("직송주문")) source = "GS";
+        if(fileName.toLowerCase().includes("직송주문")) source = "GS";
         else if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
         else if(fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
