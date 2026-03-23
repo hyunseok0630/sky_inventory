@@ -466,11 +466,14 @@
                 for (let i = 0; i < Math.min(20, rawData.length); i++) {
                     const row = rawData[i];
                     for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j]).replace(/\s/g, '');
-                        if (cellVal.match(/상품명|상품이름|주문상품|제품명/)) titleColIdx = j;
-                        else if (cellVal.match(/옵션정보|옵션명|선택옵션/)) optColIdx = j;
-                        else if (cellVal.match(/수량|구매수/)) qtyColIdx = j;
-                    }
+                    const cellVal = String(row[j]).replace(/\s/g, '');
+                    // 상품명(송장)은 '상품명'에 걸려서 자동 인식됩니다.
+                    if (cellVal.match(/상품명|상품이름|주문상품|제품명|단품명|품목명/)) titleColIdx = j;
+                    // 👉 '주문옵션' 단어 추가!
+                    else if (cellVal.match(/옵션정보|옵션명|선택옵션|단품옵션|상품옵션|주문옵션/)) optColIdx = j;
+                    // 👉 수량 관련 단어도 넉넉하게 추가
+                    else if (cellVal.match(/수량|구매수|주문수|주문수량|결제수량/)) qtyColIdx = j;
+                }
                     if (titleColIdx !== -1) { headerRowIdx = i; break; }
                 }
 
