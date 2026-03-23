@@ -142,7 +142,7 @@
         <div class="right-panel">
             <div class="card">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; border:none;">3. 판매 및 샘플 반영</h3>
+                    <h3 style="margin:0; border:none;">3. 판매 및 샘플/기타 반영</h3>
                     <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>↩️ 방금 전 되돌리기</button>
                 </div>
                 
@@ -164,7 +164,7 @@
                     <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
                 </div>
                 <div class="action-row">
-                    <input type="file" id="exFile" accept=".xlsx, .xls" style="flex:3;">
+                    <input type="file" id="exFile" accept=".xlsx, .xls, .csv" style="flex:3;">
                     <button class="btn" style="background:var(--secondary); color:white; flex:1;" onclick="loadExcel()">엑셀 일괄반영</button>
                 </div>
 
@@ -178,7 +178,20 @@
                     <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">출고</button>
                 </div>
 
-                <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:13px; margin-top:10px;">🔄 샘플 반납 (나가있는샘플 차감/재고회복)</div>
+                <div style="font-weight:bold; color:#2980b9; margin-bottom:8px; font-size:13px; margin-top:10px;">🛠️ 교환 / A/S / 파손 출고 (매출제외/재고차감)</div>
+                <div class="action-row">
+                    <select id="asItemSelect" style="flex:2;"></select>
+                    <input type="number" id="asQty" value="1" min="1" style="flex:0.8;">
+                    <select id="asTypeSelect" style="flex:1.2;">
+                        <option value="교환">교환</option>
+                        <option value="A/S">A/S</option>
+                        <option value="파손/불량">파손/불량</option>
+                    </select>
+                    <input type="text" id="asDest" placeholder="고객명/사유" style="flex:1.5;">
+                    <button class="btn" style="background:#2980b9; color:white; flex:1;" onclick="applyAS()">출고</button>
+                </div>
+
+                <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:13px; margin-top:10px;">🔄 샘플 / 교환 / A/S 반납 (나가있는수량 차감/재고회복)</div>
                 <div class="action-row">
                     <select id="sampleInItemSelect" style="flex:2;"></select>
                     <input type="number" id="sampleInQty" value="1" min="1" style="flex:1;">
@@ -203,7 +216,7 @@
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
                     <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
                     <div style="display:flex; gap:8px;">
-                        <button class="btn" style="background:var(--sample); color:white; font-size:12px;" onclick="exportSampleExcel()">샘플내역 엑셀다운</button>
+                        <button class="btn" style="background:var(--sample); color:white; font-size:12px;" onclick="exportSampleExcel()">미반납(샘플/AS) 엑셀다운</button>
                         <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">판매내역 엑셀다운</button>
                     </div>
                 </div>
@@ -218,7 +231,7 @@
                         <div id="inHistoryContainer" class="history-list"></div>
                     </div>
                     <div>
-                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 출고/반납 내역</div>
+                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 / 교환 / A/S 내역</div>
                         <div id="sampleHistoryContainer" class="history-list"></div>
                     </div>
                 </div>
@@ -481,7 +494,6 @@
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j] || '').replace(/\s/g, '');
                         
-                        // 💡 [핵심 해결] 제일 처음 발견된 '상품명' 기둥만 인정하도록 tIdx === -1 조건 추가!
                         if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
                             tIdx = j;
                         } else if (oIdx === -1 && cellVal.match(/옵션|단품옵션/)) {
@@ -704,6 +716,7 @@
         
         document.getElementById('directItemSelect').innerHTML = optionsHtml;
         document.getElementById('sampleItemSelect').innerHTML = optionsHtml; 
+        document.getElementById('asItemSelect').innerHTML = optionsHtml; // 교환/AS 항목
         document.getElementById('sampleInItemSelect').innerHTML = optionsHtml; 
         
         document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown.map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`).join('');
@@ -829,10 +842,28 @@
         }
     }
 
+    // 💡 새롭게 추가된 교환 및 A/S 처리 로직
+    async function applyAS() {
+        const name = document.getElementById('asItemSelect').value;
+        const qty = parseInt(document.getElementById('asQty').value) || 0;
+        const type = document.getElementById('asTypeSelect').value;
+        const reason = document.getElementById('asDest').value.trim() || "기타사유";
+        const dest = `[${type}] ${reason}`;
+        
+        const item = db_master.find(i => i.name === name);
+        if(item) { 
+            saveStateForUndo(); 
+            item.sampleQty = (item.sampleQty || 0) + qty; 
+            db_sample_history.push({ date: getToday(), name: name, qty: qty, dest: dest }); 
+            await saveToCloud(); 
+            addLog(`🛠️ ${type} 출고: ${name} ${qty}개 (${reason})`, "info"); 
+        }
+    }
+
     async function applySampleIn() {
         const name = document.getElementById('sampleInItemSelect').value;
         const qty = parseInt(document.getElementById('sampleInQty').value) || 0;
-        const dest = document.getElementById('sampleInDest').value.trim() || "기타(반납)";
+        const dest = document.getElementById('sampleInDest').value.trim() || "기타(반납/회수)";
         
         const item = db_master.find(i => i.name === name);
         if(item) { 
@@ -840,7 +871,7 @@
             item.sampleQty = (item.sampleQty || 0) - qty; 
             db_sample_history.push({ date: getToday(), name: name, qty: -qty, dest: dest }); 
             await saveToCloud(); 
-            addLog(`🔄 샘플 반납: ${name} ${qty}개 (${dest})`, "success"); 
+            addLog(`🔄 재고 회복: ${name} ${qty}개 (${dest})`, "success"); 
         }
     }
 
@@ -902,7 +933,7 @@
     }
 
     function exportSampleExcel() {
-        if(db_sample_history.length === 0) return alert("샘플 출고/반납 내역이 없습니다.");
+        if(db_sample_history.length === 0) return alert("샘플/교환/AS 출고 내역이 없습니다.");
 
         const summary = {};
         
@@ -923,14 +954,14 @@
                 if (remain > 0) {
                     excelData.push({
                         "품목명": name,
-                        "제공처/업체명": dest,
-                        "미반납 수량": remain
+                        "제공처/고객명": dest,
+                        "미반납(나가있는) 수량": remain
                     });
                 }
             });
         });
 
-        if (excelData.length === 0) return alert("현재 미반납된(나가있는) 샘플이 없습니다. 모두 반납 완료되었습니다!");
+        if (excelData.length === 0) return alert("현재 외부에 나가있는(미반납된) 재고가 없습니다!");
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
@@ -938,8 +969,8 @@
         const wscols = [{wch: 35}, {wch: 25}, {wch: 15}];
         ws['!cols'] = wscols;
 
-        XLSX.utils.book_append_sheet(wb, ws, "미반납 샘플 현황"); 
-        XLSX.writeFile(wb, `SKY_미반납샘플현황_${getToday()}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "미반납 현황 (샘플 및 AS)"); 
+        XLSX.writeFile(wb, `SKY_샘플_교환_현황_${getToday()}.xlsx`);
     }
 </script>
 </body>
