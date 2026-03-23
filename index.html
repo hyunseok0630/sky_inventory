@@ -62,9 +62,7 @@
         .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
         .tag-SSG { background: #fce4ec; color: #c2185b; border-color: #f8bbd0; }
         .tag-라운즈 { background: #e0f2f1; color: #00796b; border-color: #b2dfdb; }
-        /* 💡 금양 전용 색상 태그 추가 */
         .tag-금양 { background: #fff8e1; color: #f57f17; border-color: #ffecb3; }
-        /* 💡 GS 전용 색상 태그 추가 */
         .tag-GS { background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }
         .tag-기타 { background: #f1f3f5; color: #495057; border-color: #ced4da; }
 
@@ -432,10 +430,14 @@
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
-        if(!file) return;
+        
+        if(!file) {
+            alert("📂 엑셀 파일을 먼저 첨부해주세요!");
+            return;
+        }
 
         let source = "기타";
-        const fileName = file.name;
+        const fileName = file.name.normalize('NFC'); 
         
         if(fileName.toLowerCase().includes("직송주문")) source = "GS";
         else if(fileName.includes("DeliveryList")) source = "쿠팡";
@@ -463,18 +465,39 @@
                 let qtyColIdx = -1;
                 let optColIdx = -1;
 
-                for (let i = 0; i < Math.min(20, rawData.length); i++) {
+                for (let i = 0; i < Math.min(30, rawData.length); i++) {
                     const row = rawData[i];
+                    if(!row || row.length === 0) continue;
+
+                    let filledCols = 0;
+                    for(let c = 0; c < row.length; c++) {
+                        if(row[c] !== undefined && String(row[c]).trim() !== "") filledCols++;
+                    }
+                    
+                    if (filledCols < 4) continue;
+
+                    let tIdx = -1, oIdx = -1, qIdx = -1;
+
                     for (let j = 0; j < row.length; j++) {
-                    const cellVal = String(row[j]).replace(/\s/g, '');
-                    // 상품명(송장)은 '상품명'에 걸려서 자동 인식됩니다.
-                    if (cellVal.match(/상품명|상품이름|주문상품|제품명|단품명|품목명/)) titleColIdx = j;
-                    // 👉 '주문옵션' 단어 추가!
-                    else if (cellVal.match(/옵션정보|옵션명|선택옵션|단품옵션|상품옵션|주문옵션/)) optColIdx = j;
-                    // 👉 수량 관련 단어도 넉넉하게 추가
-                    else if (cellVal.match(/수량|구매수|주문수|주문수량|결제수량/)) qtyColIdx = j;
-                }
-                    if (titleColIdx !== -1) { headerRowIdx = i; break; }
+                        const cellVal = String(row[j] || '').replace(/\s/g, '');
+                        
+                        // 💡 [핵심 해결] 제일 처음 발견된 '상품명' 기둥만 인정하도록 tIdx === -1 조건 추가!
+                        if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
+                            tIdx = j;
+                        } else if (oIdx === -1 && cellVal.match(/옵션|단품옵션/)) {
+                            oIdx = j;
+                        } else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
+                            qIdx = j;
+                        }
+                    }
+                    
+                    if (tIdx !== -1) {
+                        titleColIdx = tIdx;
+                        optColIdx = oIdx;
+                        qtyColIdx = qIdx;
+                        headerRowIdx = i;
+                        break;
+                    }
                 }
 
                 if (titleColIdx === -1) {
@@ -490,6 +513,8 @@
 
                 for (let i = headerRowIdx + 1; i < rawData.length; i++) {
                     const row = rawData[i];
+                    if(!row) continue;
+                    
                     const rawTitle = row[titleColIdx];
                     if(!rawTitle || String(rawTitle).trim() === "") continue; 
 
