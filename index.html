@@ -78,7 +78,7 @@
         .search-box { position: relative; flex: 1; max-width: 300px; display: flex; align-items: center; }
         .search-box input { padding-left: 35px; margin: 0; border-color: var(--primary); height: 40px; box-sizing: border-box; }
         .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; }
-        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; margin: 0; padding: 0 20px; font-size: 14px; white-space: nowrap; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; margin: 0; padding: 0 15px; font-size: 14px; white-space: nowrap; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
 
         .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
         .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
@@ -117,6 +117,7 @@
                         <div class="search-box">
                             <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
                         </div>
+                        <button class="btn btn-top-mgmt" style="background:var(--danger);" onclick="checkLowStock(true)">🚨 재고 경고</button>
                         <button class="btn btn-top-mgmt" onclick="openMgmtModal()">⚙️ 품목 관리</button>
                     </div>
                 </div>
@@ -272,15 +273,34 @@
     </div>
 </div>
 
+<div id="lowStockModal" class="modal-overlay">
+    <div class="modal-content" style="width:400px; max-height: 80vh; display:flex; flex-direction:column;">
+        <h3 style="color:var(--danger); width:100%; text-align:center; margin-top:0;">🚨 재고 경고 알림</h3>
+        <p style="font-size:13px; color:#666; text-align:center; margin-bottom:15px;">남은 재고가 주간 판매량의 2배 이하인 품목입니다.</p>
+        <div id="lowStockList" style="flex:1; overflow-y:auto; margin-bottom:15px; font-size:14px; line-height:1.6; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa;"></div>
+        <button class="btn" style="width:100%; background:var(--secondary); color:white; font-size:15px;" onclick="document.getElementById('lowStockModal').style.display='none'">확인 완료</button>
+    </div>
+</div>
+
 <script>
     const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScq_LKH2f3kwLOX_Aeal/exec";
     
     let db_master = [], db_map = [], db_history = [], db_in_history = [], db_sample_history = [];
     let backup_state = null;
     let authPin = ""; 
+    let hasCheckedLowStock = false; 
 
     function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
-    function getToday() { return new Date().toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-'); }
+    
+    function getPastDateStr(daysAgo) {
+        const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+        now.setDate(now.getDate() - daysAgo);
+        const yyyy = now.getFullYear();
+        const mm = String(now.getMonth() + 1).padStart(2, '0');
+        const dd = String(now.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+    function getToday() { return getPastDateStr(0); }
     function getCurrentMonth() { return getToday().substring(0, 7); }
 
     function addLog(msg, type='info') {
@@ -414,7 +434,14 @@
             document.getElementById('currentDateDisp').innerText = today;
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
+            
             render();
+
+            if (!hasCheckedLowStock) {
+                checkLowStock(false);
+                hasCheckedLowStock = true;
+            }
+
         } catch (e) { 
             document.getElementById('mainContainer').style.display = 'none';
             document.getElementById('loginOverlay').style.display = 'flex';
@@ -439,6 +466,44 @@
             render();
         } catch (e) { addLog("구글 시트 저장 실패: " + e.message, "danger"); }
         toggleLoading(false);
+    }
+
+    function checkLowStock(isManual = false) {
+        const todayStr = getToday();
+        const sevenDaysAgoStr = getPastDateStr(7);
+        
+        let weeklySales = {};
+        db_history.forEach(h => {
+            if (h.date >= sevenDaysAgoStr && h.date <= todayStr) {
+                weeklySales[h.name] = (weeklySales[h.name] || 0) + (parseInt(h.qty) || 0);
+            }
+        });
+
+        let alerts = [];
+        
+        db_master.forEach(item => {
+            // 💡 [핵심 추가] 품목명에 '반품'이라는 단어가 있으면 경고 체크를 아예 무시합니다!
+            if (item.name.includes('반품')) return;
+
+            const todaySamplesCount = db_sample_history
+                .filter(sh => sh.name === item.name && sh.date === todayStr)
+                .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
+            const currentStock = item.initial - item.sold - todaySamplesCount;
+            const recentSales = weeklySales[item.name] || 0;
+            
+            if (currentStock <= 0) {
+                 alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--danger); font-weight:bold;">${currentStock}개</span> <span style="color:var(--danger); font-size:12px;">(재고소진/품절)</span></div>`);
+            } else if (recentSales > 0 && currentStock <= recentSales * 2) {
+                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--point); font-weight:bold;">${currentStock}개</span> <span style="color:#888; font-size:12px;">(주간판매: ${recentSales}개 / 안전재고: ${recentSales * 2}개)</span></div>`);
+            }
+        });
+
+        if (alerts.length > 0) {
+            document.getElementById('lowStockList').innerHTML = alerts.join('');
+            document.getElementById('lowStockModal').style.display = 'block';
+        } else if (isManual) {
+            alert("👍 현재 정식 판매용 모든 품목의 재고가 충분합니다!");
+        }
     }
 
     function loadExcel() {
@@ -518,21 +583,17 @@
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j] || '').replace(/\s/g, '');
                         
-                        // 💡 [수정된 핵심 로직] '주문상품순번', '상품번호' 같은 가짜 기둥을 철저히 튕겨냅니다!
                         if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            // '번호', '코드', '순번', 'ID', '여부', '구분' 이 들어있으면 절대 상품명이 아님!
                             if (!cellVal.match(/번호|코드|순번|ID|여부|구분/)) {
                                 tIdx = j;
                             }
                         } 
                         else if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
-                            // 옵션번호, 단품ID 등 무시
                             if (!cellVal.match(/번호|코드|순번|ID/)) {
                                 oIdx = j;
                             }
                         } 
                         else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
-                            // 취소수량 무시
                             if (!cellVal.match(/취소/)) {
                                 qIdx = j;
                             }
