@@ -42,6 +42,7 @@
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
+        .log-warning { color: #fdcb6e; }
         
         .history-layout { display: flex; flex-direction: column; gap: 20px; }
         .history-list { max-height: 350px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
@@ -456,6 +457,7 @@
         else if(fileName.includes("DeliveryList")) source = "쿠팡";
         else if(fileName.includes("스마트스토어")) source = "네이버";
         else if(fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
+        else if(fileName.toUpperCase().includes("SSG") || fileName.includes("협력업체출고대상")) source = "SSG";
 
         addLog(`파일 분석 시작: ${fileName} (${source})`);
 
@@ -463,10 +465,33 @@
         reader.onload = async function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
-                const wb = XLSX.read(data, { type: 'array' });
-                const sheet = wb.Sheets[wb.SheetNames[0]];
+                let wb;
+                let rawData = [];
+                
+                try {
+                    wb = XLSX.read(data, { type: 'array' });
+                    let sheet = wb.Sheets[wb.SheetNames[0]];
+                    rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
 
-                const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    let foundKorean = false;
+                    for(let i=0; i<Math.min(30, rawData.length); i++) {
+                        if(rawData[i] && rawData[i].some(cell => String(cell).match(/[가-힣]/))) {
+                            foundKorean = true; break;
+                        }
+                    }
+
+                    if (!foundKorean) {
+                        addLog("⚠️ '가짜 엑셀' 형식이 감지되어 자동 복구 모드로 전환합니다...", "warning");
+                        const textData = new TextDecoder("euc-kr").decode(data);
+                        wb = XLSX.read(textData, { type: 'string' });
+                        sheet = wb.Sheets[wb.SheetNames[0]];
+                        rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    }
+                } catch(err) {
+                    addLog("엑셀 파일을 해독하는 데 실패했습니다.", "danger");
+                    return;
+                }
+
                 if (rawData.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
 
                 let applyCount = 0;
@@ -486,7 +511,6 @@
                     for(let c = 0; c < row.length; c++) {
                         if(row[c] !== undefined && String(row[c]).trim() !== "") filledCols++;
                     }
-                    
                     if (filledCols < 4) continue;
 
                     let tIdx = -1, oIdx = -1, qIdx = -1;
@@ -494,12 +518,24 @@
                     for (let j = 0; j < row.length; j++) {
                         const cellVal = String(row[j] || '').replace(/\s/g, '');
                         
+                        // 💡 [수정된 핵심 로직] '주문상품순번', '상품번호' 같은 가짜 기둥을 철저히 튕겨냅니다!
                         if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            tIdx = j;
-                        } else if (oIdx === -1 && cellVal.match(/옵션|단품옵션/)) {
-                            oIdx = j;
-                        } else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
-                            qIdx = j;
+                            // '번호', '코드', '순번', 'ID', '여부', '구분' 이 들어있으면 절대 상품명이 아님!
+                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분/)) {
+                                tIdx = j;
+                            }
+                        } 
+                        else if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
+                            // 옵션번호, 단품ID 등 무시
+                            if (!cellVal.match(/번호|코드|순번|ID/)) {
+                                oIdx = j;
+                            }
+                        } 
+                        else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
+                            // 취소수량 무시
+                            if (!cellVal.match(/취소/)) {
+                                qIdx = j;
+                            }
                         }
                     }
                     
@@ -716,7 +752,7 @@
         
         document.getElementById('directItemSelect').innerHTML = optionsHtml;
         document.getElementById('sampleItemSelect').innerHTML = optionsHtml; 
-        document.getElementById('asItemSelect').innerHTML = optionsHtml; // 교환/AS 항목
+        document.getElementById('asItemSelect').innerHTML = optionsHtml; 
         document.getElementById('sampleInItemSelect').innerHTML = optionsHtml; 
         
         document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown.map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`).join('');
@@ -842,7 +878,6 @@
         }
     }
 
-    // 💡 새롭게 추가된 교환 및 A/S 처리 로직
     async function applyAS() {
         const name = document.getElementById('asItemSelect').value;
         const qty = parseInt(document.getElementById('asQty').value) || 0;
