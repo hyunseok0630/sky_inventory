@@ -5,62 +5,327 @@
     <title>SKY Commerce - Smart Management</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root { --primary: #03c75a; --secondary: #2c3e50; --border: #e1e4e8; --bg: #f8f9fa; --accent: #3498db; --point: #e67e22; --danger: #e74c3c; --sample: #8e44ad; }
-        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg); padding: 20px; color: #333; margin: 0; }
-        .container { max-width: 1400px; margin: 0 auto; display: none; }
-        
-        #loginOverlay { position: fixed; top:0; left:0; width:100%; height:100%; background:var(--secondary); z-index:9000; display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; }
-        .login-box { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); text-align: center; color: #333; width: 300px; }
-        .login-box h2 { margin-top: 0; color: var(--secondary); margin-bottom: 20px; }
-        .login-box input { width: 100%; padding: 12px; margin-bottom: 15px; border: 2px solid var(--border); border-radius: 8px; font-size: 16px; text-align: center; box-sizing: border-box; }
-        .login-box button { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .login-box button:hover { background: #02b04e; }
-        
-        #loadingOverlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; text-align:center; padding-top:20%; font-weight:bold; color:var(--primary); font-size: 1.2rem; }
-        
-        .backup-group { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 15px; }
-        .btn-backup { background: #636e72; color: white; padding: 8px 12px; font-size: 12px; border-radius: 6px; border:none; cursor:pointer; }
-        
-        .main-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; align-items: start; }
-        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 20px; border: 1px solid var(--border); }
-        h3 { margin-top: 0; border-bottom: 2px solid var(--primary); padding-bottom: 10px; display: inline-block; font-size: 1.1rem; color: var(--secondary); }
-        
-        table { width: 100%; border-collapse: collapse; margin-top: 5px; background: white; }
-        th, td { border: 1px solid var(--border); padding: 10px 6px; text-align: center; font-size: 14px; }
-        th { background: #f4f6f8; font-size: 13px; color: #555; position: sticky; top: 0; }
-        
-        .summary { margin-top: 15px; padding: 20px; background: var(--secondary); color: white; border-radius: 8px; text-align: right; font-size: 1.4rem; font-weight: bold; }
-        
-        .check-area { height: 280px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; background: #fff; margin-bottom: 15px; padding: 5px; }
-        .chk-item { display: flex; align-items: flex-start; padding: 10px 8px; border-bottom: 1px solid #f1f3f5; cursor: pointer; transition: 0.2s; margin: 0; box-sizing: border-box; width: 100%; }
-        .chk-item:hover { background: #f8f9fa; }
-        .chk-item input[type="checkbox"] { width: 16px; height: 16px; margin: 2px 10px 0 0; cursor: pointer; accent-color: var(--primary); flex-shrink: 0; }
-        .chk-item span { font-size: 13px; flex: 1; text-align: left; word-break: break-all; line-height: 1.4; color: #333; }
-        
-        .log-area { margin-top: 15px; padding: 10px; background: #2d3436; color: #dfe6e9; border-radius: 6px; font-family: monospace; font-size: 12px; height: 120px; overflow-y: auto; line-height: 1.6; }
-        .log-entry { border-bottom: 1px solid #444; padding: 2px 0; }
+        :root {
+            --primary: #03c75a;
+            --secondary: #2c3e50;
+            --border: #e1e4e8;
+            --bg: #f8f9fa;
+            --accent: #3498db;
+            --point: #e67e22;
+            --danger: #e74c3c;
+            --sample: #8e44ad;
+        }
+
+        body {
+            font-family: Pretendard, sans-serif;
+            background-color: var(--bg);
+            padding: 20px;
+            color: #333;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: none;
+        }
+
+        #loginOverlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: var(--secondary);
+            z-index: 9000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .login-box {
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            text-align: center;
+            color: #333;
+            width: 300px;
+        }
+
+        .login-box h2 {
+            margin-top: 0;
+            color: var(--secondary);
+            margin-bottom: 20px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 16px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .login-box button:hover {
+            background: #02b04e;
+        }
+
+        #loadingOverlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.8);
+            z-index: 9999;
+            text-align: center;
+            padding-top: 20%;
+            font-weight: bold;
+            color: var(--primary);
+            font-size: 1.2rem;
+        }
+
+        .backup-group {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .btn-backup {
+            background: #636e72;
+            color: white;
+            padding: 8px 12px;
+            font-size: 12px;
+            border-radius: 6px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr;
+            gap: 20px;
+            align-items: flex-start;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            border: 1px solid var(--border);
+        }
+
+        h3 {
+            margin-top: 0;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+            display: inline-block;
+            font-size: 1.1rem;
+            color: var(--secondary);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5px;
+            background: white;
+        }
+
+        th, td {
+            border: 1px solid var(--border);
+            padding: 10px 6px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        th {
+            background: #f4f6f8;
+            font-size: 13px;
+            color: #555;
+            position: sticky;
+            top: 0;
+        }
+
+        .summary {
+            margin-top: 15px;
+            padding: 20px;
+            background: var(--secondary);
+            color: white;
+            border-radius: 8px;
+            text-align: right;
+            font-size: 1.4rem;
+            font-weight: bold;
+        }
+
+        .check-area {
+            height: 280px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #fff;
+            margin-bottom: 15px;
+            padding: 5px;
+        }
+
+        .chk-item {
+            display: flex;
+            align-items: flex-start;
+            padding: 10px 8px;
+            border-bottom: 1px solid #f1f3f5;
+            cursor: pointer;
+            transition: 0.2s;
+            margin: 0;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        .chk-item:hover {
+            background: #f8f9fa;
+        }
+
+        .chk-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            margin: 2px 10px 0 0;
+            cursor: pointer;
+            accent-color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .chk-item span {
+            font-size: 13px;
+            flex: 1;
+            text-align: left;
+            word-break: break-all;
+            line-height: 1.4;
+            color: #333;
+        }
+
+        .log-area {
+            margin-top: 15px;
+            padding: 10px;
+            background: #2d3436;
+            color: #dfe6e9;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 12px;
+            height: 120px;
+            overflow-y: auto;
+            line-height: 1.6;
+        }
+
+        .log-entry {
+            border-bottom: 1px solid #444;
+            padding: 2px 0;
+        }
+
         .log-success { color: #55efc4; }
         .log-info { color: #74b9ff; }
         .log-danger { color: #ff7675; }
         .log-warning { color: #fdcb6e; }
-        
-        .history-layout { display: flex; flex-direction: column; gap: 20px; }
-        .history-list { max-height: 350px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 10px; border-radius: 8px; background:#fafafa; }
-        .history-day { margin-bottom: 15px; border-left: 4px solid var(--primary); padding-left: 10px; }
-        .history-day-in { border-left-color: var(--accent); }
-        .history-day-sample { border-left-color: var(--sample); }
-        .history-date { font-weight: bold; color: var(--secondary); margin-bottom: 5px; background: #eee; padding: 6px; border-radius: 4px; }
-        
-        .history-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
-        .history-sales-row { display: flex; flex-direction: column; gap: 8px; padding: 10px 5px; border-bottom: 1px solid #f0f0f0; }
-        .history-sales-header { display: flex; justify-content: space-between; align-items: flex-start; width: 100%; }
-        .history-sales-tags { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; justify-content: flex-end; }
-        
-        .source-tag { font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; border: 1px solid #ced4da; background: #f8f9fa; color: #495057; }
-        .tag-세미트론 { background: #fff3e0; color: #ef6c00; border-color: #ffe0b2; }
+
+        .history-layout {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .history-list {
+            max-height: 350px;
+            overflow-y: auto;
+            font-size: 13px;
+            border: 1px solid #eee;
+            padding: 10px;
+            border-radius: 8px;
+            background: #fafafa;
+        }
+
+        .history-day {
+            margin-bottom: 15px;
+            border-left: 4px solid var(--primary);
+            padding-left: 10px;
+        }
+
+        .history-day-in {
+            border-left-color: var(--accent);
+        }
+
+        .history-day-sample {
+            border-left-color: var(--sample);
+        }
+
+        .history-date {
+            font-weight: bold;
+            color: var(--secondary);
+            margin-bottom: 5px;
+            background: #eee;
+            padding: 6px;
+            border-radius: 4px;
+        }
+
+        .history-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 5px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .history-sales-row {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            padding: 10px 5px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .history-sales-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            width: 100%;
+        }
+
+        .history-sales-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .source-tag {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            border: 1px solid #ced4da;
+            background: #f8f9fa;
+            color: #495057;
+        }
+
         .tag-쿠팡 { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
         .tag-네이버 { background: #e8f5e9; color: #2e7d32; border-color: #c8e6c9; }
-        .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; } 
+        .tag-컴퓨존 { background: #e8eaf6; color: #3f51b5; border-color: #c5cae9; }
         .tag-SSG { background: #fce4ec; color: #c2185b; border-color: #f8bbd0; }
         .tag-라운즈 { background: #e0f2f1; color: #00796b; border-color: #b2dfdb; }
         .tag-금양 { background: #fff8e1; color: #f57f17; border-color: #ffecb3; }
@@ -68,1009 +333,1340 @@
         .tag-11번가 { background: #fff0f0; color: #c0392b; border-color: #ffcccc; }
         .tag-기타 { background: #f1f3f5; color: #495057; border-color: #ced4da; }
 
-        input, select { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid var(--border); border-radius: 6px; box-sizing: border-box; }
-        .btn { padding: 8px 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
-        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .btn-main { background: var(--primary); color: white; width: 100%; padding: 12px; margin-top: 5px; }
-        .action-row { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
-        .action-row input, .action-row select, .action-row button { margin: 0; height: 42px; width: 100%; }
-        
-        .inventory-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; gap: 10px; }
-        .search-box { position: relative; flex: 1; max-width: 300px; display: flex; align-items: center; }
-        .search-box input { padding-left: 35px; margin: 0; border-color: var(--primary); height: 40px; box-sizing: border-box; }
-        .search-box::before { content: "🔍"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-size: 16px; }
-        .btn-top-mgmt { background: var(--secondary); color: white; height: 40px; margin: 0; padding: 0 15px; font-size: 14px; white-space: nowrap; box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+        input, select {
+            width: 100%;
+            padding: 10px;
+            margin: 5px 0 15px 0;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            box-sizing: border-box;
+        }
 
-        .modal-overlay { display: none; position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); z-index:2000; }
-        .modal-content { position: absolute; top:50%; left:50%; transform:translate(-50%, -50%); background:white; padding:25px; border-radius:12px; width:400px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
-        .mgmt-menu-btn { width: 100%; padding: 15px; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 8px; background: #f8f9fa; cursor: pointer; font-weight: bold; text-align: left; transition: 0.2s; }
-        .mgmt-menu-btn:hover { background: var(--primary); color: white; }
+        .btn {
+            padding: 8px 12px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 13px;
+            transition: 0.2s;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-main {
+            background: var(--primary);
+            color: white;
+            width: 100%;
+            padding: 12px;
+            margin-top: 5px;
+        }
+
+        .action-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .action-row input,
+        .action-row select,
+        .action-row button {
+            margin: 0;
+            height: 42px;
+            width: 100%;
+        }
+
+        .inventory-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            gap: 10px;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            max-width: 300px;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-box input {
+            padding-left: 35px;
+            margin: 0;
+            border-color: var(--primary);
+            height: 40px;
+            box-sizing: border-box;
+        }
+
+        .search-box::before {
+            content: "🔍";
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 16px;
+        }
+
+        .btn-top-mgmt {
+            background: var(--secondary);
+            color: white;
+            height: 40px;
+            margin: 0;
+            padding: 0 15px;
+            font-size: 14px;
+            white-space: nowrap;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            width: 400px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+
+        .mgmt-menu-btn {
+            width: 100%;
+            padding: 15px;
+            margin-bottom: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: #f8f9fa;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: left;
+            transition: 0.2s;
+        }
+
+        .mgmt-menu-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
     </style>
 </head>
 <body>
-
-<div id="loginOverlay">
-    <div class="login-box">
-        <h2>🔒 시스템 접속</h2>
-        <p style="font-size:13px; color:#666; margin-bottom:20px;">시스템에 접근하려면 비밀번호를 입력하세요.</p>
-        <input type="password" id="loginPin" placeholder="비밀번호 입력" onkeypress="if(event.keyCode===13) checkLogin()">
-        <button onclick="checkLogin()">로그인</button>
-    </div>
-</div>
-
-<div id="loadingOverlay">☁️ 데이터를 동기화하고 있습니다...</div>
-
-<div class="container" id="mainContainer">
-    <div class="backup-group">
-        <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">📅 기준 날짜: <span id="currentDateDisp">-</span></div>
-        <button class="btn-backup" onclick="loadFromCloud()">🔄 새로고침</button>
-        <button class="btn-backup" onclick="exportData()">💾 로컬 백업</button>
-        <button class="btn-backup" onclick="document.getElementById('importFile').click()">📂 백업 복구</button>
-        <input type="file" id="importFile" style="display:none" onchange="importData(event)">
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>SKY Commerce</h2>
+            <p style="font-size:13px; color:#666; margin-bottom:20px;">관리용 PIN을 입력하세요.</p>
+            <input type="password" id="loginPin" placeholder="PIN" onkeypress="if(event.keyCode===13) checkLogin()">
+            <button onclick="checkLogin()">로그인</button>
+        </div>
     </div>
 
-    <div class="main-layout">
-        <div class="left-panel">
-            <div class="card">
-                <div class="inventory-header">
-                    <h3 style="margin:0; border:none; padding:0;">4. 실시간 재고 및 매출 현황</h3>
-                    <div style="display: flex; gap: 8px; flex: 1; justify-content: flex-end; align-items: center;">
-                        <div class="search-box">
-                            <input type="text" id="inventorySearch" placeholder="품목명 검색..." oninput="render()">
+    <div id="loadingOverlay">⏳ 데이터를 불러오는 중입니다...</div>
+
+    <div class="container" id="mainContainer">
+        <div class="backup-group">
+            <div style="margin-right:auto; color:var(--secondary); font-weight:bold;">
+                <span id="currentDateDisp"></span>
+            </div>
+            <button class="btn-backup" onclick="loadFromCloud()">불러오기</button>
+            <button class="btn-backup" onclick="exportData()">백업 내보내기</button>
+            <button class="btn-backup" onclick="document.getElementById('importFile').click()">백업 불러오기</button>
+            <input type="file" id="importFile" style="display:none;" onchange="importData(event)">
+        </div>
+
+        <div class="main-layout">
+            <div class="left-panel">
+                <div class="card">
+                    <div class="inventory-header">
+                        <h3 style="margin:0; border:none; padding:0;">4. 실시간 재고 및 매출 현황</h3>
+                        <div style="display:flex; gap:8px; flex:1; justify-content:flex-end; align-items:center;">
+                            <div class="search-box">
+                                <input type="text" id="inventorySearch" placeholder="품목 검색" oninput="render()">
+                            </div>
+                            <button class="btn btn-top-mgmt" style="background:var(--danger);" onclick="checkLowStock(true)">저재고 체크</button>
+                            <button class="btn btn-top-mgmt" onclick="openMgmtModal()">재고 관리</button>
                         </div>
-                        <button class="btn btn-top-mgmt" style="background:var(--danger);" onclick="checkLowStock(true)">🚨 재고 경고</button>
-                        <button class="btn btn-top-mgmt" onclick="openMgmtModal()">⚙️ 품목 관리</button>
+                    </div>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>품목명</th>
+                                <th>단가</th>
+                                <th>기초(이월)</th>
+                                <th>입고(월)</th>
+                                <th>판매(일)</th>
+                                <th>현재고</th>
+                                <th>매출액</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mainTable"></tbody>
+                    </table>
+                    <div class="summary">
+                        당일 매출 합계: <span id="totalSales">0</span>원
                     </div>
                 </div>
-                <table>
-                    <thead>
-                        <tr><th>품목명</th><th>단가</th><th>기초(이월)</th><th>입고(월)</th><th>판매(일)</th><th>현재고</th><th>매출액</th></tr>
-                    </thead>
-                    <tbody id="mainTable"></tbody>
-                </table>
-                <div class="summary">당일 매출 합계: <br><span id="totalSales">0</span>원</div>
+
+                <div class="card">
+                    <h3>1. 신규 품목 등록</h3>
+                    <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px;">
+                        <input type="text" id="mName" placeholder="품목명">
+                        <input type="number" id="mPrice" placeholder="단가" value="0">
+                        <input type="number" id="mQty" placeholder="초기수량" value="0">
+                    </div>
+                    <button class="btn btn-main" onclick="addItem()">등록</button>
+                </div>
             </div>
 
-            <div class="card">
-                <h3>1. 신규 품목 등록</h3>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
-                    <input type="text" id="mName" placeholder="품목명">
-                    <input type="number" id="mPrice" placeholder="단가" value="0">
-                    <input type="number" id="mQty" placeholder="기초재고" value="0">
+            <div class="right-panel">
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="margin:0; border:none;">3. 판매 및 샘플/기타 반영</h3>
+                        <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>되돌리기</button>
+                    </div>
+
+                    <div style="font-weight:bold; color:var(--point); margin-bottom:8px; font-size:13px;">🛒 판매 반영 (매출포함/재고차감)</div>
+                    <div class="action-row">
+                        <select id="directItemSelect" style="flex:2;"></select>
+                        <input type="number" id="directQty" value="1" min="1" style="flex:1;">
+                        <select id="directSource" style="flex:1.5;">
+                            <option value="세미트론">세미트론</option>
+                            <option value="쿠팡">쿠팡</option>
+                            <option value="네이버">네이버</option>
+                            <option value="컴퓨존">컴퓨존</option>
+                            <option value="SSG">SSG</option>
+                            <option value="라운즈">라운즈</option>
+                            <option value="금양">금양</option>
+                            <option value="GS">GS</option>
+                            <option value="11번가">11번가</option>
+                            <option value="기타">기타</option>
+                        </select>
+                        <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
+                    </div>
+
+                    <div class="action-row">
+                        <input type="file" id="exFile" accept=".xlsx, .xls, .csv" style="flex:3;">
+                        <button class="btn" style="background:var(--secondary); color:white; flex:1;" onclick="loadExcel()">엑셀 판매 반영</button>
+                    </div>
+
+                    <hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">
+
+                    <div style="font-weight:bold; color:var(--sample); margin-bottom:8px; font-size:13px;">🎁 샘플 출고 (매출제외/재고차감)</div>
+                    <div class="action-row">
+                        <select id="sampleItemSelect" style="flex:2;"></select>
+                        <input type="number" id="sampleQty" value="1" min="1" style="flex:1;">
+                        <input type="text" id="sampleDest" placeholder="출고처/받는사람" style="flex:1.5;">
+                        <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">반영</button>
+                    </div>
+
+                    <div style="font-weight:bold; color:#2980b9; margin-bottom:8px; font-size:13px; margin-top:10px;">🛠️ 교환 / A/S / 파손 출고 (매출제외/재고차감)</div>
+                    <div class="action-row">
+                        <select id="asItemSelect" style="flex:2;"></select>
+                        <input type="number" id="asQty" value="1" min="1" style="flex:0.8;">
+                        <select id="asTypeSelect" style="flex:1.2;">
+                            <option value="교환">교환</option>
+                            <option value="A/S">A/S</option>
+                            <option value="파손">파손</option>
+                        </select>
+                        <input type="text" id="asDest" placeholder="사유/내용" style="flex:1.5;">
+                        <button class="btn" style="background:#2980b9; color:white; flex:1;" onclick="applyAS()">반영</button>
+                    </div>
+
+                    <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:13px; margin-top:10px;">🔄 샘플 / 교환 / A/S 반납 (나가있는수량 차감/재고회복)</div>
+                    <div class="action-row">
+                        <select id="sampleInItemSelect" style="flex:2;"></select>
+                        <input type="number" id="sampleInQty" value="1" min="1" style="flex:1;">
+                        <input type="text" id="sampleInDest" placeholder="반납처/내용" style="flex:1.5;">
+                        <button class="btn" style="background:var(--primary); color:white; flex:1;" onclick="applySampleIn()">반영</button>
+                    </div>
+
+                    <div id="actionLog" class="log-area"></div>
                 </div>
-                <button class="btn btn-main" onclick="addItem()">품목 리스트 추가</button>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                            <div style="font-weight:bold; color:var(--point);">전체 히스토리</div>
+                            <div style="display:flex; gap:6px; align-items:center; font-size:12px; color:#555;">
+                                <span>조회 날짜</span>
+                                <input type="date" id="historyDate" onchange="renderHistory()" style="width:auto; padding:6px 8px; margin:0; font-size:12px;">
+                                <button class="btn" style="background:#eee; color:#555; padding:6px 10px;" onclick="resetHistoryDate()">이번 달</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="history-layout">
+                        <div>
+                            <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
+                            <div id="historyContainer" class="history-list"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">📦 입고 내역</div>
+                            <div id="inHistoryContainer" class="history-list"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 / 교환 / A/S 내역</div>
+                            <div id="sampleHistoryContainer" class="history-list"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>2. 플랫폼 상품 매칭 설정</h3>
+                    <input type="text" id="exName" placeholder="엑셀 상 품목명 (옵션 포함 전체)">
+                    <div id="itemChecks" class="check-area"></div>
+                    <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매칭 등록</button>
+                    <button class="btn" style="width:100%; background:#636e72; color:white; margin-top:8px;" onclick="openMapModal()">등록된 매핑 조회/삭제</button>
+                </div>
+
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                        <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn" style="background:var(--sample); color:white; font-size:12px;" onclick="exportSampleExcel()">AS/샘플 재고 엑셀</button>
+                            <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">월 매출 엑셀</button>
+                        </div>
+                    </div>
+                    <div class="history-layout">
+                        <div>
+                            <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">판매 내역</div>
+                            <div id="historyContainer" class="history-list"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">입고 내역</div>
+                            <div id="inHistoryContainer" class="history-list"></div>
+                        </div>
+                        <div>
+                            <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">샘플 / 교환 / A/S 내역</div>
+                            <div id="sampleHistoryContainer" class="history-list"></div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+    </div>
 
-        <div class="right-panel">
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
-                    <h3 style="margin:0; border:none;">3. 판매 및 샘플/기타 반영</h3>
-                    <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>↩️ 방금 전 되돌리기</button>
-                </div>
-                
-                <div style="font-weight:bold; color:var(--point); margin-bottom:8px; font-size:13px;">🛒 판매 반영 (매출포함/재고차감)</div>
-                <div class="action-row">
-                    <select id="directItemSelect" style="flex:2;"></select>
-                    <input type="number" id="directQty" value="1" min="1" style="flex:1;">
-                    <select id="directSource" style="flex:1.5;">
-                        <option value="세미트론">세미트론</option>
-                        <option value="쿠팡">쿠팡</option>
-                        <option value="네이버">네이버</option>
-                        <option value="컴퓨존">컴퓨존</option>
-                        <option value="SSG">SSG</option>
-                        <option value="라운즈">라운즈</option>
-                        <option value="금양">금양</option>
-                        <option value="GS">GS</option>
-                        <option value="11번가">11번가</option>
-                        <option value="기타">기타</option>
-                    </select>
-                    <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
-                </div>
-                <div class="action-row">
-                    <input type="file" id="exFile" accept=".xlsx, .xls, .csv" style="flex:3;">
-                    <button class="btn" style="background:var(--secondary); color:white; flex:1;" onclick="loadExcel()">엑셀 일괄반영</button>
-                </div>
+    <div id="mgmtModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="width:100%; text-align:center; margin-top:0;">재고 관리</h3>
+            <button class="mgmt-menu-btn" onclick="openActionModal('in')">입고(재고 추가)</button>
+            <button class="mgmt-menu-btn" onclick="openActionModal('edit')">초기수량/판매수량 수정</button>
+            <button class="mgmt-menu-btn" onclick="openActionModal('del')">품목 삭제</button>
+            <button class="btn" style="width:100%; margin-top:10px; background:#eee;" onclick="closeMgmtModal()">닫기</button>
+        </div>
+    </div>
 
-                <hr style="border:0; border-top:1px dashed #ccc; margin:20px 0;">
-
-                <div style="font-weight:bold; color:var(--sample); margin-bottom:8px; font-size:13px;">🎁 샘플 출고 (매출제외/재고차감)</div>
-                <div class="action-row">
-                    <select id="sampleItemSelect" style="flex:2;"></select>
-                    <input type="number" id="sampleQty" value="1" min="1" style="flex:1;">
-                    <input type="text" id="sampleDest" placeholder="제공처 수기입력" style="flex:1.5;">
-                    <button class="btn" style="background:var(--sample); color:white; flex:1;" onclick="applySample()">출고</button>
-                </div>
-
-                <div style="font-weight:bold; color:#2980b9; margin-bottom:8px; font-size:13px; margin-top:10px;">🛠️ 교환 / A/S / 파손 출고 (매출제외/재고차감)</div>
-                <div class="action-row">
-                    <select id="asItemSelect" style="flex:2;"></select>
-                    <input type="number" id="asQty" value="1" min="1" style="flex:0.8;">
-                    <select id="asTypeSelect" style="flex:1.2;">
-                        <option value="교환">교환</option>
-                        <option value="A/S">A/S</option>
-                        <option value="파손/불량">파손/불량</option>
-                    </select>
-                    <input type="text" id="asDest" placeholder="고객명/사유" style="flex:1.5;">
-                    <button class="btn" style="background:#2980b9; color:white; flex:1;" onclick="applyAS()">출고</button>
-                </div>
-
-                <div style="font-weight:bold; color:var(--primary); margin-bottom:8px; font-size:13px; margin-top:10px;">🔄 샘플 / 교환 / A/S 반납 (나가있는수량 차감/재고회복)</div>
-                <div class="action-row">
-                    <select id="sampleInItemSelect" style="flex:2;"></select>
-                    <input type="number" id="sampleInQty" value="1" min="1" style="flex:1;">
-                    <input type="text" id="sampleInDest" placeholder="반납처/사유 (선택)" style="flex:1.5;">
-                    <button class="btn" style="background:var(--primary); color:white; flex:1;" onclick="applySampleIn()">반납</button>
-                </div>
-                
-                <div id="actionLog" class="log-area">
-                    <div class="log-entry log-info">> 시스템 준비 완료.</div>
-                </div>
+    <div id="actionModal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 id="actionTitle" style="width:100%; text-align:center; margin-top:0;"></h3>
+            <select id="actionItemSelect"></select>
+            <div id="qtyInputArea">
+                <label id="qtyLabel"></label>
+                <input type="number" id="actionQty" value="0">
             </div>
-
-            <div class="card">
-                <h3>2. 플랫폼 상품 매칭 설정</h3>
-                <input type="text" id="exName" placeholder="엑셀 상품명 붙여넣기 (옵션 포함)">
-                <div id="itemChecks" class="check-area"></div>
-                <button class="btn btn-main" style="background: var(--accent);" onclick="addMap()">매치 저장</button>
-                <button class="btn" style="width:100%; background:#636e72; color:white; margin-top:8px;" onclick="openMapModal()">📋 매칭 규칙 확인/삭제</button>
-            </div>
-
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                    <h3 style="margin:0; border:none;">5. 전체 히스토리</h3>
-                    <div style="display:flex; gap:8px;">
-                        <button class="btn" style="background:var(--sample); color:white; font-size:12px;" onclick="exportSampleExcel()">미반납(샘플/AS) 엑셀다운</button>
-                        <button class="btn" style="background:var(--secondary); color:white; font-size:12px;" onclick="exportMonthlySalesExcel()">판매내역 엑셀다운</button>
-                    </div>
-                </div>
-                
-                <div class="history-layout">
-                    <div>
-                        <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
-                        <div id="historyContainer" class="history-list"></div>
-                    </div>
-                    <div>
-                        <div style="font-weight:bold; color:var(--accent); margin-bottom:5px;">📦 입고 내역</div>
-                        <div id="inHistoryContainer" class="history-list"></div>
-                    </div>
-                    <div>
-                        <div style="font-weight:bold; color:var(--sample); margin-bottom:5px;">🎁 샘플 / 교환 / A/S 내역</div>
-                        <div id="sampleHistoryContainer" class="history-list"></div>
-                    </div>
-                </div>
+            <div id="deleteConfirmMsg" style="display:none; color:var(--danger); font-weight:bold; margin-bottom:15px;">정말 삭제하시겠습니까? 되돌릴 수 없습니다.</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:20px;">
+                <button class="btn" style="background:#eee;" onclick="closeActionModal()">취소</button>
+                <button id="actionConfirmBtn" class="btn btn-main">확인</button>
             </div>
         </div>
     </div>
-</div>
 
-<div id="mgmtModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 style="width:100%; text-align:center;">품목 관리 메뉴</h3>
-        <button class="mgmt-menu-btn" onclick="openActionModal('in')">📦 입고 수량 추가</button>
-        <button class="mgmt-menu-btn" onclick="openActionModal('edit')">✏️ 재고 수량 수정 (실사조정)</button>
-        <button class="mgmt-menu-btn" onclick="openActionModal('del')">❌ 품목 삭제</button>
-        <button class="btn" style="width:100%; margin-top:10px; background:#eee;" onclick="closeMgmtModal()">닫기</button>
-    </div>
-</div>
-
-<div id="actionModal" class="modal-overlay">
-    <div class="modal-content">
-        <h3 id="actionTitle" style="width:100%;">관리 작업</h3>
-        <select id="actionItemSelect"></select>
-        <div id="qtyInputArea"><label id="qtyLabel">수량</label><input type="number" id="actionQty" value="0"></div>
-        <div id="deleteConfirmMsg" style="display:none; color:var(--danger); font-weight:bold; margin-bottom:15px;">정말로 이 품목을 삭제하시겠습니까?</div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px;">
-            <button class="btn" style="background:#eee;" onclick="closeActionModal()">취소</button>
-            <button id="actionConfirmBtn" class="btn btn-main">확인</button>
+    <div id="mapModal" class="modal-overlay">
+        <div class="modal-content" style="width:500px;">
+            <h3 style="width:100%; text-align:center; margin-top:0;">등록된 매핑 목록</h3>
+            <div id="mapList" style="max-height:300px; overflow-y:auto; margin-bottom:15px; font-size:13px;"></div>
+            <button class="btn" style="width:100%; background:#eee;" onclick="closeMapModal()">닫기</button>
         </div>
     </div>
-</div>
 
-<div id="mapModal" class="modal-overlay">
-    <div class="modal-content" style="width:500px;">
-        <h3 style="width:100%; text-align:center; margin-top:0;">매칭 규칙 관리</h3>
-        <div id="mapList" style="max-height:300px; overflow-y:auto; margin-bottom:15px; font-size:13px;"></div>
-        <button class="btn" style="width:100%; background:#eee;" onclick="closeMapModal()">닫기</button>
+    <div id="lowStockModal" class="modal-overlay">
+        <div class="modal-content" style="width:400px; max-height:80vh; display:flex; flex-direction:column;">
+            <h3 style="color:var(--danger); width:100%; text-align:center; margin-top:0;">저재고 품목 알림</h3>
+            <p style="font-size:13px; color:#666; text-align:center; margin-bottom:15px;">
+                최근 7일 판매량을 기준으로 소진 가능성이 있는 품목입니다.
+            </p>
+            <div id="lowStockList" style="flex:1; overflow-y:auto; margin-bottom:15px; font-size:14px; line-height:1.6; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa;"></div>
+            <button class="btn" style="width:100%; background:var(--secondary); color:white; font-size:15px;" onclick="document.getElementById('lowStockModal').style.display='none'">닫기</button>
+        </div>
     </div>
-</div>
 
-<div id="lowStockModal" class="modal-overlay">
-    <div class="modal-content" style="width:400px; max-height: 80vh; display:flex; flex-direction:column;">
-        <h3 style="color:var(--danger); width:100%; text-align:center; margin-top:0;">🚨 재고 경고 알림</h3>
-        <p style="font-size:13px; color:#666; text-align:center; margin-bottom:15px;">남은 재고가 주간 판매량의 2배 이하인 품목입니다.</p>
-        <div id="lowStockList" style="flex:1; overflow-y:auto; margin-bottom:15px; font-size:14px; line-height:1.6; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa;"></div>
-        <button class="btn" style="width:100%; background:var(--secondary); color:white; font-size:15px;" onclick="document.getElementById('lowStockModal').style.display='none'">확인 완료</button>
-    </div>
-</div>
+    <script>
+        const GSCRIPTURL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScqLKH2f3kwLOXAeal/exec";
 
-<script>
-    const G_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzqJqMC77LUuiLfMY96tsqwO3Y8SgExGVaxhsPqJoHjGgiJScq_LKH2f3kwLOX_Aeal/exec";
-    
-    let db_master = [], db_map = [], db_history = [], db_in_history = [], db_sample_history = [];
-    let backup_state = null;
-    let authPin = ""; 
-    let hasCheckedLowStock = false; 
+        let dbmaster = [];
+        let dbmap = [];
+        let dbhistory = [];
+        let dbinhistory = [];
+        let dbsamplehistory = [];
+        let backupstate = null;
+        let authPin;
+        let hasCheckedLowStock = false;
 
-    function toggleLoading(show) { document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none'; }
-    
-    function getPastDateStr(daysAgo) {
-        const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-        now.setDate(now.getDate() - daysAgo);
-        const yyyy = now.getFullYear();
-        const mm = String(now.getMonth() + 1).padStart(2, '0');
-        const dd = String(now.getDate()).padStart(2, '0');
-        return `${yyyy}-${mm}-${dd}`;
-    }
-    function getToday() { return getPastDateStr(0); }
-    function getCurrentMonth() { return getToday().substring(0, 7); }
-
-    function addLog(msg, type='info') {
-        const logArea = document.getElementById('actionLog');
-        const now = new Date().toLocaleTimeString();
-        const entry = document.createElement('div');
-        entry.className = `log-entry log-${type}`;
-        entry.innerText = `[${now}] ${msg}`;
-        logArea.prepend(entry);
-    }
-
-    const cleanStr = s => String(s).replace(/\s+/g, '').replace(/[\[\]"]/g, '');
-
-    function saveStateForUndo() {
-        backup_state = { 
-            master: JSON.parse(JSON.stringify(db_master)), 
-            history: JSON.parse(JSON.stringify(db_history)),
-            inHistory: JSON.parse(JSON.stringify(db_in_history)),
-            sampleHistory: JSON.parse(JSON.stringify(db_sample_history)),
-            map: JSON.parse(JSON.stringify(db_map))
-        };
-        document.getElementById('undoBtn').disabled = false;
-    }
-
-    function checkLogin() {
-        const inputPin = document.getElementById('loginPin').value;
-        if(!inputPin) { alert("비밀번호를 입력하세요."); return; }
-        authPin = inputPin;
-        document.getElementById('loginOverlay').style.display = 'none';
-        document.getElementById('mainContainer').style.display = 'block';
-        loadFromCloud(); 
-    }
-
-    async function undoLastAction() {
-        if (!backup_state) return;
-        toggleLoading(true);
-        db_master = backup_state.master;
-        db_history = backup_state.history;
-        db_in_history = backup_state.inHistory;
-        db_sample_history = backup_state.sampleHistory;
-        db_map = backup_state.map;
-        
-        backup_state = null;
-        document.getElementById('undoBtn').disabled = true;
-        
-        try {
-            const resp = await fetch(G_SCRIPT_URL, { 
-                method: "POST", 
-                body: JSON.stringify({ 
-                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sampleHistory: db_sample_history,
-                    lastDate: getToday(), lastMonth: getCurrentMonth() 
-                })
-            });
-            const result = await resp.json();
-            if(result.error) throw new Error(result.error);
-            
-            addLog("⚠️ 방금 전 1건의 작업이 정확히 취소(되돌리기) 되었습니다.", "warning");
-            render();
-        } catch (e) {
-            addLog("되돌리기 실패: " + e.message, "danger");
+        function toggleLoading(show) {
+            document.getElementById("loadingOverlay").style.display = show ? "block" : "none";
         }
-        toggleLoading(false);
-    }
 
-    async function loadFromCloud() {
-        toggleLoading(true);
-        try {
-            const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime() + "&pin=" + authPin;
-            const resp = await fetch(fetchUrl);
-            const data = await resp.json();
-            
-            if(data.error) {
-                document.getElementById('mainContainer').style.display = 'none';
-                document.getElementById('loginOverlay').style.display = 'flex';
-                document.getElementById('loginPin').value = '';
-                alert("⚠️ " + data.error);
-                toggleLoading(false);
+        function getPastDateStr(daysAgo) {
+            const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+            now.setDate(now.getDate() - daysAgo);
+            const yyyy = now.getFullYear();
+            const mm = String(now.getMonth() + 1).padStart(2, "0");
+            const dd = String(now.getDate()).padStart(2, "0");
+            return `${yyyy}-${mm}-${dd}`;
+        }
+
+        function getToday() {
+            return getPastDateStr(0);
+        }
+
+        function getCurrentMonth() {
+            return getToday().substring(0, 7);
+        }
+
+        function addLog(msg, type = "info") {
+            const logArea = document.getElementById("actionLog");
+            const now = new Date().toLocaleTimeString();
+            const entry = document.createElement("div");
+            entry.className = `log-entry log-${type}`;
+            entry.innerText = `[${now}] ${msg}`;
+            logArea.prepend(entry);
+        }
+
+        function cleanStr(s) {
+            if (!s && s !== 0) return "";
+            return String(s).replace(/\s+/g, "").replace(/[\[\]\(\)]/g, "").trim();
+        }
+
+        function saveStateForUndo() {
+            backupstate = {
+                master: JSON.parse(JSON.stringify(dbmaster)),
+                history: JSON.parse(JSON.stringify(dbhistory)),
+                inHistory: JSON.parse(JSON.stringify(dbinhistory)),
+                sampleHistory: JSON.parse(JSON.stringify(dbsamplehistory)),
+                map: JSON.parse(JSON.stringify(dbmap))
+            };
+            document.getElementById("undoBtn").disabled = false;
+        }
+
+        function checkLogin() {
+            const inputPin = document.getElementById("loginPin").value.trim();
+            if (!inputPin) {
+                alert("PIN을 입력하세요.");
                 return;
             }
-            
-            db_master = data.master || [];
-            db_map = (data.map || []).map(m => {
-                let t = m.targets || [];
-                if (typeof t === 'string') { try { t = JSON.parse(t); } catch(e) { t = t.split(','); } }
-                if (!Array.isArray(t)) t = [t];
-                t = t.map(x => String(x).replace(/[\[\]"]/g, '').trim()).filter(x => x && x !== 'undefined' && x !== 'null');
-                return { exName: String(m.exName || '').trim(), targets: t };
-            }).filter(m => m.exName);
-
-            db_history = (data.history || []).map(h => {
-                let d = h.date || getToday();
-                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
-                return { ...h, date: d, name: h.name || '알수없음' };
-            });
-
-            db_in_history = (data.inHistory || []).map(h => {
-                let d = h.date || getToday();
-                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
-                return { ...h, date: d };
-            });
-
-            db_sample_history = (data.sampleHistory || []).map(h => {
-                let d = h.date || getToday();
-                if (d.includes('T')) d = new Date(d).toLocaleString("ko-KR", {timeZone: "Asia/Seoul"}).split(". ").slice(0,3).map(v=>v.padStart(2,'0')).join('-');
-                return { ...h, date: d, name: h.name || '알수없음' };
-            });
-            
-            const today = getToday();
-            const currentMonth = getCurrentMonth();
-            let needsSave = false;
-
-            if (data.lastMonth && data.lastMonth < currentMonth) {
-                db_master.forEach(i => i.inQty = 0);
-                addLog(`새로운 달(${currentMonth})이 시작되어 입고량이 초기화되었습니다.`, "info");
-                needsSave = true;
-            }
-
-            if (data.lastDate && data.lastDate < today) {
-                db_master.forEach(i => { 
-                    const pendingSamples = db_sample_history
-                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
-                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-
-                    i.initial = i.initial - i.sold - pendingSamples; 
-                    i.sold = 0; 
-                });
-                needsSave = true;
-            }
-
-            if (needsSave) await saveToCloud();
-            document.getElementById('currentDateDisp').innerText = today;
-            backup_state = null;
-            document.getElementById('undoBtn').disabled = true;
-            
-            render();
-
-            if (!hasCheckedLowStock) {
-                checkLowStock(false);
-                hasCheckedLowStock = true;
-            }
-
-        } catch (e) { 
-            document.getElementById('mainContainer').style.display = 'none';
-            document.getElementById('loginOverlay').style.display = 'flex';
-            alert("서버 연결 실패!\n1. 앱스 스크립트 '새 버전 배포'를 다시 확인해주세요.\n2. 콘솔창에 자세한 에러가 있습니다.");
-            console.error(e);
-        }
-        toggleLoading(false);
-    }
-
-    async function saveToCloud() {
-        toggleLoading(true);
-        try {
-            const resp = await fetch(G_SCRIPT_URL, { 
-                method: "POST", 
-                body: JSON.stringify({ 
-                    action: "save", pin: authPin, master: db_master, map: db_map, history: db_history, inHistory: db_in_history, sampleHistory: db_sample_history,
-                    lastDate: getToday(), lastMonth: getCurrentMonth() 
-                })
-            });
-            const result = await resp.json();
-            if(result.error) throw new Error(result.error);
-            render();
-        } catch (e) { addLog("구글 시트 저장 실패: " + e.message, "danger"); }
-        toggleLoading(false);
-    }
-
-    function checkLowStock(isManual = false) {
-        const todayStr = getToday();
-        const sevenDaysAgoStr = getPastDateStr(7);
-        
-        let weeklySales = {};
-        db_history.forEach(h => {
-            if (h.date >= sevenDaysAgoStr && h.date <= todayStr) {
-                weeklySales[h.name] = (weeklySales[h.name] || 0) + (parseInt(h.qty) || 0);
-            }
-        });
-
-        let alerts = [];
-        
-        db_master.forEach(item => {
-            // 💡 [핵심 추가] 품목명에 '반품'이라는 단어가 있으면 경고 체크를 아예 무시합니다!
-            if (item.name.includes('반품')) return;
-
-            const todaySamplesCount = db_sample_history
-                .filter(sh => sh.name === item.name && sh.date === todayStr)
-                .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-            const currentStock = item.initial - item.sold - todaySamplesCount;
-            const recentSales = weeklySales[item.name] || 0;
-            
-            if (currentStock <= 0) {
-                 alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--danger); font-weight:bold;">${currentStock}개</span> <span style="color:var(--danger); font-size:12px;">(재고소진/품절)</span></div>`);
-            } else if (recentSales > 0 && currentStock <= recentSales * 2) {
-                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--point); font-weight:bold;">${currentStock}개</span> <span style="color:#888; font-size:12px;">(주간판매: ${recentSales}개 / 안전재고: ${recentSales * 2}개)</span></div>`);
-            }
-        });
-
-        if (alerts.length > 0) {
-            document.getElementById('lowStockList').innerHTML = alerts.join('');
-            document.getElementById('lowStockModal').style.display = 'block';
-        } else if (isManual) {
-            alert("👍 현재 정식 판매용 모든 품목의 재고가 충분합니다!");
-        }
-    }
-
-    function loadExcel() {
-        const fileInput = document.getElementById('exFile');
-        const file = fileInput.files[0];
-        
-        if(!file) {
-            alert("📂 엑셀 파일을 먼저 첨부해주세요!");
-            return;
+            authPin = inputPin;
+            document.getElementById("loginOverlay").style.display = "none";
+            document.getElementById("mainContainer").style.display = "block";
+            loadFromCloud();
         }
 
-        let source = "기타";
-        const fileName = file.name.normalize('NFC'); 
-        
-        if(fileName.toLowerCase().includes("직송주문")) source = "GS";
-        else if(fileName.includes("DeliveryList")) source = "쿠팡";
-        else if(fileName.includes("스마트스토어")) source = "네이버";
-        else if(fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
-        else if(fileName.toUpperCase().includes("SSG") || fileName.includes("협력업체출고대상")) source = "SSG";
-        else if(fileName.includes("logistics") || fileName.toLowerCase().includes("11st")) source = "11번가";
+        async function undoLastAction() {
+            if (!backupstate) return;
+            toggleLoading(true);
+            dbmaster = backupstate.master;
+            dbhistory = backupstate.history;
+            dbinhistory = backupstate.inHistory;
+            dbsamplehistory = backupstate.sampleHistory;
+            dbmap = backupstate.map;
+            backupstate = null;
+            document.getElementById("undoBtn").disabled = true;
 
-        addLog(`파일 분석 시작: ${fileName} (${source})`);
-
-        const reader = new FileReader();
-        reader.onload = async function(e) {
             try {
-                const data = new Uint8Array(e.target.result);
-                let wb;
-                let rawData = [];
-                
-                try {
-                    wb = XLSX.read(data, { type: 'array' });
-                    let sheet = wb.Sheets[wb.SheetNames[0]];
-                    rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                const resp = await fetch(GSCRIPTURL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "save",
+                        pin: authPin,
+                        master: dbmaster,
+                        map: dbmap,
+                        history: dbhistory,
+                        inHistory: dbinhistory,
+                        sampleHistory: dbsamplehistory,
+                        lastDate: getToday(),
+                        lastMonth: getCurrentMonth()
+                    })
+                });
+                const result = await resp.json();
+                if (result.error) throw new Error(result.error);
+                addLog("되돌리기 완료 후 저장했습니다.", "warning");
+                render();
+            } catch (e) {
+                addLog(e.message, "danger");
+            }
+            toggleLoading(false);
+        }
 
-                    let foundKorean = false;
-                    for(let i=0; i<Math.min(30, rawData.length); i++) {
-                        if(rawData[i] && rawData[i].some(cell => String(cell).match(/[가-힣]/))) {
-                            foundKorean = true; break;
-                        }
-                    }
+        async function loadFromCloud() {
+            toggleLoading(true);
+            try {
+                const fetchUrl = `${GSCRIPTURL}?ts=${new Date().getTime()}&pin=${authPin}`;
+                const resp = await fetch(fetchUrl);
+                const data = await resp.json();
 
-                    if (!foundKorean) {
-                        addLog("⚠️ '가짜 엑셀' 형식이 감지되어 자동 복구 모드로 전환합니다...", "warning");
-                        const textData = new TextDecoder("euc-kr").decode(data);
-                        wb = XLSX.read(textData, { type: 'string' });
-                        sheet = wb.Sheets[wb.SheetNames[0]];
-                        rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-                    }
-                } catch(err) {
-                    addLog("엑셀 파일을 해독하는 데 실패했습니다.", "danger");
+                if (data.error) {
+                    document.getElementById("mainContainer").style.display = "none";
+                    document.getElementById("loginOverlay").style.display = "flex";
+                    document.getElementById("loginPin").value = "";
+                    alert(data.error);
+                    toggleLoading(false);
                     return;
                 }
 
-                if (rawData.length === 0) return addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
-
-                let applyCount = 0;
-                let failNames = new Set();
-                let parsedRows = 0;
-
-                let headerRowIdx = -1;
-                let titleColIdx = -1;
-                let qtyColIdx = -1;
-                let optColIdx = -1;
-
-                for (let i = 0; i < Math.min(30, rawData.length); i++) {
-                    const row = rawData[i];
-                    if(!row || row.length === 0) continue;
-
-                    let filledCols = 0;
-                    for(let c = 0; c < row.length; c++) {
-                        if(row[c] !== undefined && String(row[c]).trim() !== "") filledCols++;
+                dbmaster = data.master || [];
+                dbmap = (data.map || []).map(m => {
+                    let t = m.targets;
+                    if (typeof t === "string") {
+                        try { t = JSON.parse(t); } catch(e) { t = t.split(","); }
                     }
-                    if (filledCols < 4) continue;
-
-                    let tIdx = -1, oIdx = -1, qIdx = -1;
-
-                    for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j] || '').replace(/\s/g, '');
-                        
-                        if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분/)) {
-                                tIdx = j;
-                            }
-                        } 
-                        else if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID/)) {
-                                oIdx = j;
-                            }
-                        } 
-                        else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
-                            if (!cellVal.match(/취소/)) {
-                                qIdx = j;
-                            }
-                        }
-                    }
-                    
-                    if (tIdx !== -1) {
-                        titleColIdx = tIdx;
-                        optColIdx = oIdx;
-                        qtyColIdx = qIdx;
-                        headerRowIdx = i;
-                        break;
-                    }
-                }
-
-                if (titleColIdx === -1) {
-                    addLog(`❌ 엑셀에서 '상품명/제품명' 기둥을 찾지 못했습니다.`, "danger");
-                    fileInput.value = ""; return;
-                }
-
-                let snapshot_master = JSON.parse(JSON.stringify(db_master));
-                let snapshot_history = JSON.parse(JSON.stringify(db_history));
-                let snapshot_in_history = JSON.parse(JSON.stringify(db_in_history));
-                let snapshot_sample_history = JSON.parse(JSON.stringify(db_sample_history));
-                let snapshot_map = JSON.parse(JSON.stringify(db_map));
-
-                for (let i = headerRowIdx + 1; i < rawData.length; i++) {
-                    const row = rawData[i];
-                    if(!row) continue;
-                    
-                    const rawTitle = row[titleColIdx];
-                    if(!rawTitle || String(rawTitle).trim() === "") continue; 
-
-                    parsedRows++;
-                    
-                    const title = String(rawTitle).trim(); 
-                    const opt = (optColIdx !== -1 && row[optColIdx]) ? String(row[optColIdx]).trim() : "";
-                    const fullTitle = opt ? `${title} [${opt}]` : title;
-
-                    let qty = 1;
-                    if (qtyColIdx !== -1 && row[qtyColIdx]) {
-                        qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, '')) || 1;
-                    }
-
-                    let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle)); 
-                    if (!rule && opt) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(opt)); 
-                    if (!rule) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(title)); 
-                    
-                    if(rule) {
-                        let appliedToItem = false;
-                        if(rule.targets && rule.targets.length > 0) {
-                            rule.targets.forEach(tName => { 
-                                const item = db_master.find(masterItem => cleanStr(masterItem.name) === cleanStr(tName)); 
-                                if(item) { 
-                                    item.sold += qty; 
-                                    addHistory(item.name, qty, source); 
-                                    applyCount++; 
-                                    appliedToItem = true; 
-                                } 
-                            });
-                        }
-                        if(!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${fullTitle} 👉 연결대상: ${rule.targets.join(', ')}`);
-                    } else failNames.add(fullTitle); 
-                }
-
-                if(applyCount > 0) {
-                    backup_state = { 
-                        master: snapshot_master, 
-                        history: snapshot_history,
-                        inHistory: snapshot_in_history,
-                        sampleHistory: snapshot_sample_history,
-                        map: snapshot_map
-                    };
-                    document.getElementById('undoBtn').disabled = false;
-                    
-                    await saveToCloud();
-                    addLog(`${applyCount}건의 데이터가 완벽하게 반영되었습니다.`, "success");
-                } else {
-                    db_master = snapshot_master;
-                    db_history = snapshot_history;
-                    db_in_history = snapshot_in_history;
-                    db_sample_history = snapshot_sample_history;
-                    db_map = snapshot_map;
-                    addLog(`반영 0건. 미매칭 내역을 확인해주세요. (읽은 줄수: ${parsedRows})`, "warning");
-                }
-
-                if(failNames.size > 0) {
-                    const failArr = Array.from(failNames);
-                    const displayFails = failArr.slice(0, 3).join(' | ');
-                    addLog(`[오류 내역]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
-                }
-                fileInput.value = "";
-            } catch (err) { addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger"); }
-        };
-        reader.readAsArrayBuffer(file);
-    }
-
-    function addHistory(name, qty, source) {
-        if (!name || name === 'undefined' || name === 'null') return;
-        db_history.push({ date: getToday(), name: name, qty: qty, source: source });
-    }
-
-    function render() {
-        const table = document.getElementById('mainTable');
-        const search = document.getElementById('inventorySearch').value.toLowerCase();
-        let dayTotalSales = 0; 
-        const todayStr = getToday();
-
-        const sortedMasterData = [...db_master]
-            .filter(i => (i.name || "").toLowerCase().includes(search))
-            .sort((a, b) => (b.price || 0) - (a.price || 0));
-
-        table.innerHTML = sortedMasterData.map(item => {
-            const todaySamplesCount = db_sample_history
-                .filter(sh => sh.name === item.name && sh.date === todayStr)
-                .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-
-            const currentStock = item.initial - item.sold - todaySamplesCount; 
-            const salesAmount = item.sold * item.price; 
-            dayTotalSales += salesAmount; 
-
-            return `
-                <tr>
-                    <td style="text-align:left"><b>${item.name}</b></td>
-                    <td>${item.price.toLocaleString()}</td>
-                    <td>${item.initial - (item.inQty||0)}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
-                    <td style="color:var(--point); font-weight:bold;">${item.sold}</td>
-                    <td>${currentStock}</td>
-                    <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
-                </tr>
-            `;
-        }).join('');
-
-        document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
-
-        const historyList = document.getElementById('historyContainer');
-        const grouped = db_history.reduce((acc, obj) => { 
-            acc[obj.date] = acc[obj.date] || {};
-            const safeName = obj.name === 'undefined' ? '알수없음' : obj.name;
-            acc[obj.date][safeName] = acc[obj.date][safeName] || {};
-            let s = obj.source || '기타';
-            acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
-            return acc; 
-        }, {});
-
-        let hHtml = "";
-        Object.keys(grouped).sort().reverse().forEach(date => {
-            hHtml += `<div class="history-day"><div class="history-date">${date}</div>`;
-            Object.keys(grouped[date]).forEach(name => {
-                let total = 0, tags = "";
-                Object.keys(grouped[date][name]).forEach(src => {
-                    total += grouped[date][name][src];
-                    tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span>`;
+                    if (!Array.isArray(t)) t = [];
+                    t = t.map(x => String(x).replace(/\s+/g, "").trim()).filter(x => x !== "" && x !== "undefined" && x !== "null");
+                    return { exName: String(m.exName || "").trim(), targets: t };
                 });
-                hHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="color:var(--secondary); white-space:nowrap;">총 ${total}</b></div><div class="history-sales-tags">${tags}</div></div>`;
-            });
-            hHtml += `</div>`;
-        });
-        historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
 
-        const sampleHistoryList = document.getElementById('sampleHistoryContainer');
-        const groupedSample = db_sample_history.reduce((acc, obj) => { 
-            acc[obj.date] = acc[obj.date] || {};
-            const safeName = obj.name || '알수없음';
-            acc[obj.date][safeName] = acc[obj.date][safeName] || {};
-            let dest = obj.dest || '기타';
-            let type = obj.qty > 0 ? 'out' : 'in';
-            let key = dest + '|||' + type; 
-            acc[obj.date][safeName][key] = (acc[obj.date][safeName][key] || 0) + obj.qty;
-            return acc; 
-        }, {});
-
-        let sHtml = "";
-        Object.keys(groupedSample).sort().reverse().forEach(date => {
-            sHtml += `<div class="history-day history-day-sample"><div class="history-date">${date}</div>`;
-            Object.keys(groupedSample[date]).forEach(name => {
-                let total = 0, tags = "";
-                Object.keys(groupedSample[date][name]).forEach(key => {
-                    let q = groupedSample[date][name][key];
-                    if (q === 0) return; 
-                    total += q;
-                    let dest = key.split('|||')[0];
-                    let tagStyle = q < 0 ? `background:#e8f5e9; color:var(--primary); border-color:#c8e6c9;` : `background:#f5eef8; color:var(--sample); border-color:#d7bde2;`;
-                    let qText = q < 0 ? `반납 ${-q}` : `출고 ${q}`;
-                    tags += `<span class="source-tag" style="${tagStyle}">${dest} ${qText}</span>`;
+                dbhistory = (data.history || []).map(h => {
+                    let d = h.date || getToday();
+                    if (d.includes("T")) {
+                        d = new Date(d).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }).split(" ")[0].split(".").slice(0,3).map(v => v.padStart(2, "0")).join("-");
+                    }
+                    return { ...h, date: d, name: h.name };
                 });
-                if (total !== 0 || tags !== "") {
-                    let totalStyle = total < 0 ? `color:var(--primary);` : (total > 0 ? `color:var(--sample);` : `color:#888;`);
-                    let totalText = total < 0 ? `순반납 ${-total}` : (total > 0 ? `순출고 ${total}` : `변동 0`);
-                    sHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="${totalStyle} white-space:nowrap;">${totalText}</b></div><div class="history-sales-tags">${tags}</div></div>`;
-                }
-            });
-            sHtml += `</div>`;
-        });
-        sampleHistoryList.innerHTML = sHtml || "<div style='padding:10px; text-align:center;'>샘플 출고/반납 내역 없음</div>";
 
-        const inHistoryList = document.getElementById('inHistoryContainer');
-        const groupedIn = db_in_history.reduce((acc, obj) => { 
-            acc[obj.date] = acc[obj.date] || {};
-            acc[obj.date][obj.name] = (acc[obj.date][obj.name] || 0) + obj.qty;
-            return acc; 
-        }, {});
+                dbinhistory = (data.inHistory || []).map(h => {
+                    let d = h.date || getToday();
+                    if (d.includes("T")) {
+                        d = new Date(d).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }).split(" ")[0].split(".").slice(0,3).map(v => v.padStart(2, "0")).join("-");
+                    }
+                    return { ...h, date: d };
+                });
 
-        let inHtml = "";
-        Object.keys(groupedIn).sort().reverse().forEach(date => {
-            inHtml += `<div class="history-day history-day-in"><div class="history-date">${date}</div>`;
-            Object.keys(groupedIn[date]).forEach(name => {
-                inHtml += `<div class="history-row"><span style="flex:1;">${name}</span><b style="color:var(--accent);">+${groupedIn[date][name]}개</b></div>`;
-            });
-            inHtml += `</div>`;
-        });
-        inHistoryList.innerHTML = inHtml || "<div style='padding:10px; text-align:center;'>입고 내역 없음</div>";
+                dbsamplehistory = (data.sampleHistory || []).map(h => {
+                    let d = h.date || getToday();
+                    if (d.includes("T")) {
+                        d = new Date(d).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" }).split(" ")[0].split(".").slice(0,3).map(v => v.padStart(2, "0")).join("-");
+                    }
+                    return { ...h, date: d, name: h.name };
+                });
 
-        const sortedItemsForDropdown = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
-        const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-        
-        document.getElementById('directItemSelect').innerHTML = optionsHtml;
-        document.getElementById('sampleItemSelect').innerHTML = optionsHtml; 
-        document.getElementById('asItemSelect').innerHTML = optionsHtml; 
-        document.getElementById('sampleInItemSelect').innerHTML = optionsHtml; 
-        
-        document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown.map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`).join('');
-    }
+                const today = getToday();
+                const currentMonth = getCurrentMonth();
+                let needsSave = false;
 
-    function openMapModal() {
-        const list = document.getElementById('mapList');
-        list.innerHTML = db_map.map((m, i) => `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:8px 0;">
-                <div style="flex:1; word-break:keep-all;"><b>${m.exName}</b> <br><span style="color:var(--primary); font-weight:bold;">👉 ${m.targets.length > 0 ? m.targets.join(', ') : '<span style="color:red;">연결품목 없음(오류)</span>'}</span></div>
-                <button class="btn" style="background:var(--danger); color:white; padding:6px 10px;" onclick="deleteMap(${i})">삭제</button>
-            </div>
-        `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
-        document.getElementById('mapModal').style.display = 'block';
-    }
-    
-    async function deleteMap(idx) {
-        saveStateForUndo(); 
-        db_map.splice(idx, 1);
-        await saveToCloud();
-        addLog("매칭 규칙 삭제 완료", "success");
-        openMapModal();
-    }
-
-    function closeMapModal() { document.getElementById('mapModal').style.display = 'none'; }
-    function openMgmtModal() { document.getElementById('mgmtModal').style.display = 'block'; }
-    function closeMgmtModal() { document.getElementById('mgmtModal').style.display = 'none'; }
-    let currentMode = '';
-    
-    function openActionModal(mode) {
-        currentMode = mode;
-        closeMgmtModal();
-        const select = document.getElementById('actionItemSelect');
-        const sorted = [...db_master].sort((a,b) => (a.name||"").localeCompare((b.name||""), 'ko'));
-        select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
-        document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
-        document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
-        document.getElementById('actionQty').value = 0;
-        const confirmBtn = document.getElementById('actionConfirmBtn');
-        if(mode === 'in') {
-            document.getElementById('actionTitle').innerText = "📦 입고 수량 추가";
-            document.getElementById('qtyLabel').innerText = "추가할 입고량";
-            confirmBtn.innerText = "입고하기";
-            confirmBtn.style.background = 'var(--primary)';
-        } else if(mode === 'edit') {
-            document.getElementById('actionTitle').innerText = "✏️ 재고 수량 수정";
-            document.getElementById('qtyLabel').innerText = "수정할 실재고";
-            confirmBtn.innerText = "수정하기";
-            confirmBtn.style.background = 'var(--primary)';
-        } else {
-            document.getElementById('actionTitle').innerText = "❌ 품목 삭제";
-            confirmBtn.innerText = "삭제하기";
-            confirmBtn.style.background = 'var(--danger)';
-        }
-        confirmBtn.onclick = processMgmtAction;
-        document.getElementById('actionModal').style.display = 'block';
-    }
-    function closeActionModal() { document.getElementById('actionModal').style.display = 'none'; }
-    
-    async function processMgmtAction() {
-        const itemName = document.getElementById('actionItemSelect').value;
-        const qty = parseInt(document.getElementById('actionQty').value) || 0;
-        const idx = db_master.findIndex(i => i.name === itemName);
-        if(idx === -1) return;
-
-        saveStateForUndo(); 
-
-        if(currentMode === 'in') {
-            db_master[idx].initial += qty;
-            db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
-            db_in_history.push({ date: getToday(), name: itemName, qty: qty });
-        }
-        else if(currentMode === 'edit') { 
-            db_master[idx].initial = qty; 
-            db_master[idx].sold = 0; 
-        }
-        else if(currentMode === 'del') db_master.splice(idx, 1);
-        
-        await saveToCloud();
-        addLog(`관리 완료: ${itemName}`, "success");
-        closeActionModal();
-    }
-
-    async function addItem() {
-        const name = document.getElementById('mName').value.trim();
-        if(!name) return;
-        
-        saveStateForUndo(); 
-
-        db_master.push({ name, price: parseInt(document.getElementById('mPrice').value)||0, initial: parseInt(document.getElementById('mQty').value)||0, sold: 0, inQty: 0, sampleQty: 0 });
-        await saveToCloud();
-        addLog(`신규 등록: ${name}`, "info");
-        document.getElementById('mName').value = "";
-    }
-
-    async function applyDirectSale() {
-        const name = document.getElementById('directItemSelect').value;
-        const qty = parseInt(document.getElementById('directQty').value) || 0;
-        const source = document.getElementById('directSource').value || "기타";
-        
-        const item = db_master.find(i => i.name === name);
-        if(item) { 
-            saveStateForUndo(); 
-            item.sold += qty; 
-            addHistory(name, qty, source); 
-            await saveToCloud(); 
-            addLog(`🛒 판매 반영: ${name} ${qty}개 (${source})`, "success"); 
-        }
-    }
-
-    async function applySample() {
-        const name = document.getElementById('sampleItemSelect').value;
-        const qty = parseInt(document.getElementById('sampleQty').value) || 0;
-        const dest = document.getElementById('sampleDest').value.trim() || "기타(미상)";
-        
-        const item = db_master.find(i => i.name === name);
-        if(item) { 
-            saveStateForUndo(); 
-            item.sampleQty = (item.sampleQty || 0) + qty; 
-            db_sample_history.push({ date: getToday(), name: name, qty: qty, dest: dest }); 
-            await saveToCloud(); 
-            addLog(`🎁 샘플 출고: ${name} ${qty}개 (${dest})`, "info"); 
-        }
-    }
-
-    async function applyAS() {
-        const name = document.getElementById('asItemSelect').value;
-        const qty = parseInt(document.getElementById('asQty').value) || 0;
-        const type = document.getElementById('asTypeSelect').value;
-        const reason = document.getElementById('asDest').value.trim() || "기타사유";
-        const dest = `[${type}] ${reason}`;
-        
-        const item = db_master.find(i => i.name === name);
-        if(item) { 
-            saveStateForUndo(); 
-            item.sampleQty = (item.sampleQty || 0) + qty; 
-            db_sample_history.push({ date: getToday(), name: name, qty: qty, dest: dest }); 
-            await saveToCloud(); 
-            addLog(`🛠️ ${type} 출고: ${name} ${qty}개 (${reason})`, "info"); 
-        }
-    }
-
-    async function applySampleIn() {
-        const name = document.getElementById('sampleInItemSelect').value;
-        const qty = parseInt(document.getElementById('sampleInQty').value) || 0;
-        const dest = document.getElementById('sampleInDest').value.trim() || "기타(반납/회수)";
-        
-        const item = db_master.find(i => i.name === name);
-        if(item) { 
-            saveStateForUndo(); 
-            item.sampleQty = (item.sampleQty || 0) - qty; 
-            db_sample_history.push({ date: getToday(), name: name, qty: -qty, dest: dest }); 
-            await saveToCloud(); 
-            addLog(`🔄 재고 회복: ${name} ${qty}개 (${dest})`, "success"); 
-        }
-    }
-
-    async function addMap() {
-        const exName = document.getElementById('exName').value.trim();
-        const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
-        if(!exName || targets.length === 0) { alert("연결할 내부 품목을 체크해주세요!"); return; }
-        
-        saveStateForUndo(); 
-        
-        db_map.push({ exName, targets });
-        await saveToCloud();
-        addLog(`규칙 추가: ${exName}`, "info");
-        document.getElementById('exName').value = "";
-        document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
-    }
-
-    function exportMonthlySalesExcel() {
-        const currentMonth = getCurrentMonth();
-        const monthlyData = db_history.filter(h => h.date.startsWith(currentMonth));
-        if(monthlyData.length === 0) return alert("이번 달 판매 내역이 없습니다.");
-
-        const summary = {};
-        const sources = new Set();
-
-        monthlyData.forEach(row => {
-            const name = row.name;
-            const qty = parseInt(row.qty) || 0;
-            const source = row.source || "기타";
-
-            if (!summary[name]) summary[name] = { "총 판매수량": 0 };
-            summary[name]["총 판매수량"] += qty;
-            
-            if (!summary[name][source]) summary[name][source] = 0;
-            summary[name][source] += qty;
-            
-            sources.add(source);
-        });
-
-        const sourceArray = Array.from(sources).sort();
-
-        const excelData = Object.keys(summary).sort().map(name => {
-            const rowData = { "품목명": name, "총 판매수량": summary[name]["총 판매수량"] };
-            sourceArray.forEach(src => {
-                rowData[src] = summary[name][src] || 0; 
-            });
-            return rowData;
-        });
-
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(excelData);
-
-        const wscols = [{wch: 35}, {wch: 12}];
-        sourceArray.forEach(() => wscols.push({wch: 10})); 
-        ws['!cols'] = wscols;
-
-        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약 (샘플제외)"); 
-        XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
-    }
-
-    function exportSampleExcel() {
-        if(db_sample_history.length === 0) return alert("샘플/교환/AS 출고 내역이 없습니다.");
-
-        const summary = {};
-        
-        db_sample_history.forEach(row => {
-            const name = row.name;
-            const dest = row.dest || "기타";
-            const qty = parseInt(row.qty) || 0;
-            
-            if (!summary[name]) summary[name] = {};
-            if (!summary[name][dest]) summary[name][dest] = 0;
-            summary[name][dest] += qty;
-        });
-
-        const excelData = [];
-        Object.keys(summary).sort().forEach(name => {
-            Object.keys(summary[name]).sort().forEach(dest => {
-                const remain = summary[name][dest];
-                if (remain > 0) {
-                    excelData.push({
-                        "품목명": name,
-                        "제공처/고객명": dest,
-                        "미반납(나가있는) 수량": remain
+                if (data.lastMonth && data.lastMonth !== currentMonth) {
+                    dbmaster.forEach(i => {
+                        i.inQty = 0;
                     });
+                    addLog(`새로운 달 진입(${currentMonth}) - 월 입고량 초기화`, "info");
+                    needsSave = true;
+                }
+
+                if (data.lastDate && data.lastDate !== today) {
+                    dbmaster.forEach(i => {
+                        const pendingSamples = dbsamplehistory
+                            .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
+                            .reduce((sum, sh) => sum + parseInt(sh.qty || 0, 10), 0);
+                        i.initial = (i.initial || 0) - (i.sold || 0) - pendingSamples;
+                        i.sold = 0;
+                    });
+                    addLog(`새로운 날짜 진입(${today}) - 일 판매량 리셋 및 재고 반영`, "info");
+                    needsSave = true;
+                }
+
+                if (needsSave) await saveToCloud();
+
+                document.getElementById("currentDateDisp").innerText = today;
+                backupstate = null;
+                document.getElementById("undoBtn").disabled = true;
+                render();
+
+                if (!hasCheckedLowStock) {
+                    checkLowStock(false);
+                    hasCheckedLowStock = true;
+                }
+            } catch (e) {
+                console.error(e);
+                document.getElementById("mainContainer").style.display = "none";
+                document.getElementById("loginOverlay").style.display = "flex";
+                alert("데이터를 불러오는 중 오류가 발생했습니다.\n\n1. PIN을 다시 확인해 주세요.\n2. 인터넷 연결을 확인해 주세요.");
+            }
+            toggleLoading(false);
+        }
+
+        async function saveToCloud() {
+            toggleLoading(true);
+            try {
+                const resp = await fetch(GSCRIPTURL, {
+                    method: "POST",
+                    body: JSON.stringify({
+                        action: "save",
+                        pin: authPin,
+                        master: dbmaster,
+                        map: dbmap,
+                        history: dbhistory,
+                        inHistory: dbinhistory,
+                        sampleHistory: dbsamplehistory,
+                        lastDate: getToday(),
+                        lastMonth: getCurrentMonth()
+                    })
+                });
+                const result = await resp.json();
+                if (result.error) throw new Error(result.error);
+                render();
+            } catch (e) {
+                addLog(e.message, "danger");
+            }
+            toggleLoading(false);
+        }
+
+        function checkLowStock(isManual = false) {
+            const todayStr = getToday();
+            const sevenDaysAgoStr = getPastDateStr(7);
+            let weeklySales = {};
+
+            dbhistory.forEach(h => {
+                if (h.date >= sevenDaysAgoStr && h.date <= todayStr) {
+                    weeklySales[h.name] = (weeklySales[h.name] || 0) + parseInt(h.qty || 0, 10);
                 }
             });
-        });
 
-        if (excelData.length === 0) return alert("현재 외부에 나가있는(미반납된) 재고가 없습니다!");
+            let alerts = [];
 
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(excelData);
+            dbmaster.forEach(item => {
+                if (!item || !item.name || item.name.includes("테스트")) return;
 
-        const wscols = [{wch: 35}, {wch: 25}, {wch: 15}];
-        ws['!cols'] = wscols;
+                const todaySamplesCount = dbsamplehistory
+                    .filter(sh => sh.name === item.name && sh.date === todayStr)
+                    .reduce((sum, sh) => sum + parseInt(sh.qty || 0, 10), 0);
 
-        XLSX.utils.book_append_sheet(wb, ws, "미반납 현황 (샘플 및 AS)"); 
-        XLSX.writeFile(wb, `SKY_샘플_교환_현황_${getToday()}.xlsx`);
-    }
-</script>
+                const currentStock = (item.initial || 0) - (item.sold || 0) - todaySamplesCount;
+                const recentSales = weeklySales[item.name] || 0;
+
+                if (currentStock <= 0) {
+                    alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;">
+                        <b>${item.name}</b><br>
+                        <span style="color:var(--danger); font-weight:bold;">현재고: ${currentStock}</span>
+                        <span style="color:var(--danger); font-size:12px;"> (즉시 발주 필요)</span>
+                    </div>`);
+                } else if (recentSales > 0 && currentStock <= recentSales * 2) {
+                    alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;">
+                        <b>${item.name}</b><br>
+                        <span style="color:var(--point); font-weight:bold;">현재고: ${currentStock}</span>
+                        <span style="color:#888; font-size:12px;"> (최근 7일 판매량: ${recentSales})</span>
+                    </div>`);
+                }
+            });
+
+            if (alerts.length > 0) {
+                document.getElementById("lowStockList").innerHTML = alerts.join("");
+                document.getElementById("lowStockModal").style.display = "block";
+            } else if (isManual) {
+                alert("현재 저재고로 분류된 품목이 없습니다.");
+            }
+        }
+
+        function loadExcel() {
+            const fileInput = document.getElementById("exFile");
+            const file = fileInput.files[0];
+            if (!file) {
+                alert("엑셀 파일을 선택해 주세요.");
+                return;
+            }
+
+            let source = "기타";
+            const fileName = file.name.normalize("NFC");
+
+            if (fileName.toLowerCase().includes("직송주문")) source = "GS";
+            else if (fileName.includes("DeliveryList")) source = "쿠팡";
+            else if (fileName.includes("스마트스토어")) source = "네이버";
+            else if (fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
+            else if (fileName.toUpperCase().includes("SSG") || fileName.includes("협력업체출고대상")) source = "SSG";
+            else if (fileName.includes("73093241") || fileName.toLowerCase().includes("11st")) source = "11번가";
+
+            addLog(`파일 분석 시작: ${fileName} (${source})`, "info");
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    let wb;
+                    let rawData = [];
+
+                    try {
+                        wb = XLSX.read(data, { type: "array" });
+                        let sheet = wb.Sheets[wb.SheetNames[0]];
+                        rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    } catch (err) {
+                        addLog("기본 방식으로 엑셀 파싱에 실패, EUC-KR로 재시도", "warning");
+                        const textData = new TextDecoder("euc-kr").decode(data);
+                        wb = XLSX.read(textData, { type: "string" });
+                        let sheet = wb.Sheets[wb.SheetNames[0]];
+                        rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+                    }
+
+                    if (!rawData || rawData.length === 0) {
+                        addLog("엑셀 데이터가 비어 있습니다.", "danger");
+                        return;
+                    }
+
+                    let applyCount = 0;
+                    let failNames = new Set();
+                    let parsedRows = 0;
+
+                    let headerRowIdx = -1;
+                    let titleColIdx = -1;
+                    let qtyColIdx = -1;
+                    let optColIdx = -1;
+
+                    for (let i = 0; i < Math.min(30, rawData.length); i++) {
+                        const row = rawData[i];
+                        if (!row || row.length === 0) continue;
+
+                        let filledCols = 0;
+                        for (let c = 0; c < row.length; c++) {
+                            if (row[c] !== undefined && String(row[c]).trim() !== "") {
+                                filledCols++;
+                            }
+                        }
+                        if (filledCols < 4) continue;
+
+                        let tIdx = -1, oIdx = -1, qIdx = -1;
+                        for (let j = 0; j < row.length; j++) {
+                            const cellVal = String(row[j]).replace(/\s+/g, "");
+                            if (tIdx === -1 && cellVal.match(/상품명|품목명|상품명\(옵션포함\)/)) tIdx = j;
+                            else if (oIdx === -1 && cellVal.match(/옵션명|옵션/)) oIdx = j;
+                            else if (qIdx === -1 && cellVal.match(/수량|Qty|주문수량/)) qIdx = j;
+                        }
+
+                        if (tIdx !== -1) {
+                            titleColIdx = tIdx;
+                            optColIdx = oIdx;
+                            qtyColIdx = qIdx;
+                            headerRowIdx = i;
+                            break;
+                        }
+                    }
+
+                    if (titleColIdx === -1) {
+                        addLog("상품명(또는 품목명) 컬럼을 찾지 못했습니다. 헤더를 확인해 주세요.", "danger");
+                        fileInput.value = "";
+                        return;
+                    }
+
+                    let snapshotmaster = JSON.parse(JSON.stringify(dbmaster));
+                    let snapshothistory = JSON.parse(JSON.stringify(dbhistory));
+                    let snapshotinhistory = JSON.parse(JSON.stringify(dbinhistory));
+                    let snapshotsamplehistory = JSON.parse(JSON.stringify(dbsamplehistory));
+                    let snapshotmap = JSON.parse(JSON.stringify(dbmap));
+
+                    for (let i = headerRowIdx + 1; i < rawData.length; i++) {
+                        const row = rawData[i];
+                        if (!row) continue;
+
+                        const rawTitle = row[titleColIdx];
+                        if (!rawTitle || String(rawTitle).trim() === "") continue;
+                        parsedRows++;
+
+                        const title = String(rawTitle).trim();
+                        const opt = (optColIdx !== -1 && row[optColIdx]) ? String(row[optColIdx]).trim() : "";
+                        const fullTitle = opt ? `${title} ${opt}` : title;
+
+                        let qty = 1;
+                        if (qtyColIdx !== -1 && row[qtyColIdx]) {
+                            qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, "") || "1", 10);
+                        }
+
+                        let rule = dbmap.find(m => cleanStr(m.exName) === cleanStr(fullTitle));
+                        if (!rule && opt) rule = dbmap.find(m => cleanStr(m.exName) === cleanStr(opt));
+                        if (!rule) rule = dbmap.find(m => cleanStr(m.exName) === cleanStr(title));
+
+                        if (rule) {
+                            let appliedToItem = false;
+                            if (rule.targets && rule.targets.length > 0) {
+                                rule.targets.forEach(tName => {
+                                    const item = dbmaster.find(masterItem => cleanStr(masterItem.name) === cleanStr(tName));
+                                    if (item) {
+                                        item.sold = (item.sold || 0) + qty;
+                                        addHistory(item.name, qty, source);
+                                        applyCount++;
+                                        appliedToItem = true;
+                                    }
+                                });
+                            }
+                            if (!appliedToItem) {
+                                failNames.add(`${fullTitle} → 매칭된 품목 없음`);
+                            }
+                        } else {
+                            failNames.add(fullTitle);
+                        }
+                    }
+
+                    if (applyCount > 0) {
+                        backupstate = {
+                            master: snapshotmaster,
+                            history: snapshothistory,
+                            inHistory: snapshotinhistory,
+                            sampleHistory: snapshotsamplehistory,
+                            map: snapshotmap
+                        };
+                        document.getElementById("undoBtn").disabled = false;
+
+                        await saveToCloud();
+                        addLog(`엑셀 반영 완료: ${applyCount}건 반영 (전체 ${parsedRows}행 중)`, "success");
+                    } else {
+                        dbmaster = snapshotmaster;
+                        dbhistory = snapshothistory;
+                        dbinhistory = snapshotinhistory;
+                        dbsamplehistory = snapshotsamplehistory;
+                        dbmap = snapshotmap;
+                        addLog(`엑셀에서 반영 가능한 데이터가 없습니다. (유효행: ${parsedRows})`, "warning");
+                    }
+
+                    if (failNames.size > 0) {
+                        const failArr = Array.from(failNames);
+                        const displayFails = failArr.slice(0, 3).join(" / ");
+                        addLog(`매칭 실패 품목 예시: ${displayFails}${failArr.length > 3 ? " 외 " + (failArr.length - 3) + "건" : ""}`, "danger");
+                    }
+
+                    fileInput.value = "";
+                } catch (err) {
+                    console.error(err);
+                    addLog("엑셀 처리 중 오류가 발생했습니다: " + err.message, "danger");
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function addHistory(name, qty, source) {
+            if (!name || name === "undefined" || name === null) return;
+            dbhistory.push({
+                date: getToday(),
+                name: name,
+                qty: qty,
+                source: source
+            });
+        }
+
+        function renderHistory() {
+            render();
+        }
+
+        function resetHistoryDate() {
+            const input = document.getElementById("historyDate");
+            if (input) input.value = "";
+            render();
+        }
+
+        function render() {
+            const table = document.getElementById("mainTable");
+            const search = document.getElementById("inventorySearch").value.toLowerCase();
+            let dayTotalSales = 0;
+            const todayStr = getToday();
+
+            const sortedMasterData = [...dbmaster]
+                .filter(i => i && i.name && i.name.toLowerCase().includes(search))
+                .sort((a, b) => (b.price || 0) - (a.price || 0));
+
+            table.innerHTML = sortedMasterData.map(item => {
+                const todaySamplesCount = dbsamplehistory
+                    .filter(sh => sh.name === item.name && sh.date === todayStr)
+                    .reduce((sum, sh) => sum + parseInt(sh.qty || 0, 10), 0);
+
+                const currentStock = (item.initial || 0) - (item.sold || 0) - todaySamplesCount;
+                const salesAmount = (item.sold || 0) * (item.price || 0);
+                dayTotalSales += salesAmount;
+
+                return `
+                    <tr>
+                        <td style="text-align:left;"><b>${item.name}</b></td>
+                        <td>${(item.price || 0).toLocaleString()}</td>
+                        <td>${(item.initial || 0) - (item.inQty || 0)}</td>
+                        <td style="color:var(--accent); font-weight:bold;">${item.inQty || 0}</td>
+                        <td style="color:var(--point); font-weight:bold;">${item.sold || 0}</td>
+                        <td>${currentStock}</td>
+                        <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
+                    </tr>
+                `;
+            }).join("");
+
+            document.getElementById("totalSales").innerText = dayTotalSales.toLocaleString();
+
+            const historyList = document.getElementById("historyContainer");
+            const historyDateInput = document.getElementById("historyDate");
+            const selectedDate = historyDateInput && historyDateInput.value ? historyDateInput.value : null;
+            const currentMonth = getCurrentMonth();
+
+            const filteredHistory = dbhistory.filter(h => {
+                if (!h.date) return false;
+                if (selectedDate) return h.date === selectedDate;
+                return h.date.startsWith(currentMonth);
+            });
+
+            const grouped = filteredHistory.reduce((acc, obj) => {
+                acc[obj.date] = acc[obj.date] || {};
+                const safeName = obj.name === undefined ? obj.name : obj.name;
+                acc[obj.date][safeName] = acc[obj.date][safeName] || {};
+                let s = obj.source;
+                acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + parseInt(obj.qty || 0, 10);
+                return acc;
+            }, {});
+
+            let hHtml = "";
+            Object.keys(grouped).sort().reverse().forEach(date => {
+                hHtml += `<div class="history-day"><div class="history-date">${date}</div>`;
+                Object.keys(grouped[date]).forEach(name => {
+                    let total = 0, tags = "";
+                    Object.keys(grouped[date][name]).forEach(src => {
+                        total += grouped[date][name][src];
+                        tags += `<span class="source-tag tag-${src}">${src} x${grouped[date][name][src]}</span>`;
+                    });
+                    hHtml += `
+                        <div class="history-sales-row">
+                            <div class="history-sales-header">
+                                <span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span>
+                                <b style="color:var(--secondary); white-space:nowrap;">${total}</b>
+                            </div>
+                            <div class="history-sales-tags">${tags}</div>
+                        </div>
+                    `;
+                });
+                hHtml += `</div>`;
+            });
+            historyList.innerHTML = hHtml || '<div style="padding:10px; text-align:center;">표시할 내역이 없습니다.</div>';
+
+            const sampleHistoryList = document.getElementById("sampleHistoryContainer");
+            const groupedSample = dbsamplehistory.reduce((acc, obj) => {
+                acc[obj.date] = acc[obj.date] || {};
+                const safeName = obj.name === undefined ? obj.name : obj.name;
+                acc[obj.date][safeName] = acc[obj.date][safeName] || {};
+                let dest = obj.dest || "";
+                let type = obj.qty >= 0 ? "out" : "in";
+                let key = `${dest}||${type}`;
+                acc[obj.date][safeName][key] = (acc[obj.date][safeName][key] || 0) + parseInt(obj.qty || 0, 10);
+                return acc;
+            }, {});
+
+            let sHtml = "";
+            Object.keys(groupedSample).sort().reverse().forEach(date => {
+                sHtml += `<div class="history-day history-day-sample"><div class="history-date">${date}</div>`;
+                Object.keys(groupedSample[date]).forEach(name => {
+                    let total = 0, tags = "";
+                    Object.keys(groupedSample[date][name]).forEach(key => {
+                        let q = groupedSample[date][name][key];
+                        if (q === 0) return;
+                        total += q;
+                        let dest = key.split("||")[0];
+                        let type = key.split("||")[1];
+                        let tagStyle = q > 0 ? "background:#e8f5e9; color:var(--primary); border-color:#c8e6c9;" : "background:#f5eef8; color:var(--sample); border-color:#d7bde2;";
+                        let qText = q > 0 ? `출고 ${q}` : `반납 ${Math.abs(q)}`;
+                        tags += `<span class="source-tag" style="${tagStyle}">${dest || (type === "out" ? "기타 출고" : "기타 반납")} (${qText})</span>`;
+                    });
+                    if (total !== 0 || tags !== "") {
+                        let totalStyle = total > 0 ? "color:var(--primary);" : (total < 0 ? "color:var(--sample);" : "color:#888;");
+                        let totalText = total > 0 ? `순출고 ${total}` : (total < 0 ? `순반납 ${Math.abs(total)}` : "변동 없음");
+                        sHtml += `
+                            <div class="history-sales-row">
+                                <div class="history-sales-header">
+                                    <span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span>
+                                    <b style="${totalStyle} white-space:nowrap;">${totalText}</b>
+                                </div>
+                                <div class="history-sales-tags">${tags}</div>
+                            </div>
+                        `;
+                    }
+                });
+                sHtml += `</div>`;
+            });
+            sampleHistoryList.innerHTML = sHtml || '<div style="padding:10px; text-align:center;">표시할 내역이 없습니다.</div>';
+
+            const inHistoryList = document.getElementById("inHistoryContainer");
+            const groupedIn = dbinhistory.reduce((acc, obj) => {
+                acc[obj.date] = acc[obj.date] || {};
+                acc[obj.date][obj.name] = (acc[obj.date][obj.name] || 0) + parseInt(obj.qty || 0, 10);
+                return acc;
+            }, {});
+
+            let inHtml = "";
+            Object.keys(groupedIn).sort().reverse().forEach(date => {
+                inHtml += `<div class="history-day history-day-in"><div class="history-date">${date}</div>`;
+                Object.keys(groupedIn[date]).forEach(name => {
+                    inHtml += `
+                        <div class="history-row">
+                            <span style="flex:1;">${name}</span>
+                            <b style="color:var(--accent);">${groupedIn[date][name]}</b>
+                        </div>
+                    `;
+                });
+                inHtml += `</div>`;
+            });
+            inHtml = inHtml || '<div style="padding:10px; text-align:center;">표시할 내역이 없습니다.</div>';
+            inHistoryList.innerHTML = inHtml;
+
+            const sortedItemsForDropdown = [...dbmaster].sort((a, b) => a.name.localeCompare(b.name, "ko"));
+            const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join("");
+            document.getElementById("directItemSelect").innerHTML = optionsHtml;
+            document.getElementById("sampleItemSelect").innerHTML = optionsHtml;
+            document.getElementById("asItemSelect").innerHTML = optionsHtml;
+            document.getElementById("sampleInItemSelect").innerHTML = optionsHtml;
+
+            document.getElementById("itemChecks").innerHTML = sortedItemsForDropdown.map(i => `
+                <label class="chk-item">
+                    <input type="checkbox" class="chk" value="${i.name}">
+                    <span>${i.name}</span>
+                </label>
+            `).join("");
+        }
+
+        function openMapModal() {
+            const list = document.getElementById("mapList");
+            list.innerHTML = dbmap.map((m, i) => `
+                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:8px 0;">
+                    <div style="flex:1; word-break:keep-all;">
+                        <b>${m.exName}</b><br>
+                        <span style="color:var(--primary); font-weight:bold;">
+                            ${m.targets.length > 0 ? m.targets.join(", ") : "연결된 품목 없음"}
+                        </span>
+                    </div>
+                    <button class="btn" style="background:var(--danger); color:white; padding:6px 10px;" onclick="deleteMap(${i})">삭제</button>
+                </div>
+            `).join("") || '<div style="text-align:center; padding:20px;">등록된 매핑이 없습니다.</div>';
+            document.getElementById("mapModal").style.display = "block";
+        }
+
+        async function deleteMap(idx) {
+            saveStateForUndo();
+            dbmap.splice(idx, 1);
+            await saveToCloud();
+            addLog("매핑을 삭제했습니다.", "success");
+            openMapModal();
+        }
+
+        function closeMapModal() {
+            document.getElementById("mapModal").style.display = "none";
+        }
+
+        function openMgmtModal() {
+            document.getElementById("mgmtModal").style.display = "block";
+        }
+
+        function closeMgmtModal() {
+            document.getElementById("mgmtModal").style.display = "none";
+        }
+
+        let currentMode = null;
+
+        function openActionModal(mode) {
+            currentMode = mode;
+            closeMgmtModal();
+
+            const select = document.getElementById("actionItemSelect");
+            const sorted = [...dbmaster].sort((a, b) => a.name.localeCompare(b.name, "ko"));
+            select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join("");
+
+            document.getElementById("qtyInputArea").style.display = mode === "del" ? "none" : "block";
+            document.getElementById("deleteConfirmMsg").style.display = mode === "del" ? "block" : "none";
+            document.getElementById("actionQty").value = 0;
+
+            const confirmBtn = document.getElementById("actionConfirmBtn");
+
+            if (mode === "in") {
+                document.getElementById("actionTitle").innerText = "입고(재고 추가)";
+                document.getElementById("qtyLabel").innerText = "추가할 수량:";
+                confirmBtn.innerText = "입고 반영";
+                confirmBtn.style.background = "var(--primary)";
+            } else if (mode === "edit") {
+                document.getElementById("actionTitle").innerText = "초기수량/판매수량 수정";
+                document.getElementById("qtyLabel").innerText = "새로운 초기수량:";
+                confirmBtn.innerText = "수정 반영";
+                confirmBtn.style.background = "var(--primary)";
+            } else {
+                document.getElementById("actionTitle").innerText = "품목 삭제";
+                confirmBtn.innerText = "삭제";
+                confirmBtn.style.background = "var(--danger)";
+            }
+
+            confirmBtn.onclick = processMgmtAction;
+            document.getElementById("actionModal").style.display = "block";
+        }
+
+        function closeActionModal() {
+            document.getElementById("actionModal").style.display = "none";
+        }
+
+        async function processMgmtAction() {
+            const itemName = document.getElementById("actionItemSelect").value;
+            const qty = parseInt(document.getElementById("actionQty").value || "0", 10);
+            const idx = dbmaster.findIndex(i => i.name === itemName);
+            if (idx === -1) return;
+
+            saveStateForUndo();
+
+            if (currentMode === "in") {
+                dbmaster[idx].initial = (dbmaster[idx].initial || 0) + qty;
+                dbmaster[idx].inQty = (dbmaster[idx].inQty || 0) + qty;
+                dbinhistory.push({ date: getToday(), name: itemName, qty: qty });
+            } else if (currentMode === "edit") {
+                dbmaster[idx].initial = qty;
+                dbmaster[idx].sold = 0;
+            } else if (currentMode === "del") {
+                dbmaster.splice(idx, 1);
+            }
+
+            await saveToCloud();
+            addLog(`${itemName} (${currentMode === "in" ? "입고" : currentMode === "edit" ? "수정" : "삭제"})`, "success");
+            closeActionModal();
+        }
+
+        async function addItem() {
+            const name = document.getElementById("mName").value.trim();
+            if (!name) return;
+            saveStateForUndo();
+            dbmaster.push({
+                name: name,
+                price: parseInt(document.getElementById("mPrice").value || "0", 10),
+                initial: parseInt(document.getElementById("mQty").value || "0", 10),
+                sold: 0,
+                inQty: 0,
+                sampleQty: 0
+            });
+            await saveToCloud();
+            addLog(`${name} 품목을 등록했습니다.`, "info");
+            document.getElementById("mName").value = "";
+            document.getElementById("mPrice").value = "0";
+            document.getElementById("mQty").value = "0";
+        }
+
+        async function applyDirectSale() {
+            const name = document.getElementById("directItemSelect").value;
+            const qty = parseInt(document.getElementById("directQty").value || "0", 10);
+            const source = document.getElementById("directSource").value;
+
+            if (!name || qty <= 0) {
+                alert("품목과 수량을 확인해 주세요.");
+                return;
+            }
+
+            const item = dbmaster.find(i => i.name === name);
+            if (item) {
+                saveStateForUndo();
+                item.sold = (item.sold || 0) + qty;
+                addHistory(name, qty, source);
+                await saveToCloud();
+                addLog(`직접판매 반영: ${name} ${qty}개 (${source})`, "success");
+            }
+        }
+
+        async function applySample() {
+            const name = document.getElementById("sampleItemSelect").value;
+            const qty = parseInt(document.getElementById("sampleQty").value || "0", 10);
+            const dest = document.getElementById("sampleDest").value.trim();
+            const item = dbmaster.find(i => i.name === name);
+            if (item && qty > 0) {
+                saveStateForUndo();
+                item.sampleQty = (item.sampleQty || 0) + qty;
+                dbsamplehistory.push({
+                    date: getToday(),
+                    name: name,
+                    qty: qty,
+                    dest: dest
+                });
+                await saveToCloud();
+                addLog(`샘플 출고: ${name} ${qty}개 -> ${dest}`, "info");
+            }
+        }
+
+        async function applyAS() {
+            const name = document.getElementById("asItemSelect").value;
+            const qty = parseInt(document.getElementById("asQty").value || "0", 10);
+            const type = document.getElementById("asTypeSelect").value;
+            const reason = document.getElementById("asDest").value.trim();
+            const dest = `${type} / ${reason}`;
+            const item = dbmaster.find(i => i.name === name);
+            if (item && qty > 0) {
+                saveStateForUndo();
+                item.sampleQty = (item.sampleQty || 0) + qty;
+                dbsamplehistory.push({
+                    date: getToday(),
+                    name: name,
+                    qty: qty,
+                    dest: dest
+                });
+                await saveToCloud();
+                addLog(`${type} 출고: ${name} ${qty}개 (${reason})`, "info");
+            }
+        }
+
+        async function applySampleIn() {
+            const name = document.getElementById("sampleInItemSelect").value;
+            const qty = parseInt(document.getElementById("sampleInQty").value || "0", 10);
+            const dest = document.getElementById("sampleInDest").value.trim();
+            const item = dbmaster.find(i => i.name === name);
+            if (item && qty > 0) {
+                saveStateForUndo();
+                item.sampleQty = (item.sampleQty || 0) - qty;
+                dbsamplehistory.push({
+                    date: getToday(),
+                    name: name,
+                    qty: -qty,
+                    dest: dest
+                });
+                await saveToCloud();
+                addLog(`샘플/AS 반납: ${name} ${qty}개 (${dest})`, "success");
+            }
+        }
+
+        async function addMap() {
+            const exName = document.getElementById("exName").value.trim();
+            const targets = Array.from(document.querySelectorAll(".chk:checked")).map(c => c.value.trim());
+            if (!exName || targets.length === 0) {
+                alert("엑셀 품목명과 연결할 품목을 선택해 주세요.");
+                return;
+            }
+            saveStateForUndo();
+            dbmap.push({ exName, targets });
+            await saveToCloud();
+            addLog(`매핑 등록: ${exName} → ${targets.join(", ")}`, "info");
+            document.getElementById("exName").value = "";
+            document.querySelectorAll(".chk:checked").forEach(c => c.checked = false);
+        }
+
+        function exportMonthlySalesExcel() {
+            const currentMonth = getCurrentMonth();
+            const monthlyData = dbhistory.filter(h => h.date && h.date.startsWith(currentMonth));
+            if (monthlyData.length === 0) {
+                alert("이번 달 매출 데이터가 없습니다.");
+                return;
+            }
+
+            const summary = {};
+            const sources = new Set();
+
+            monthlyData.forEach(row => {
+                const name = row.name;
+                const qty = parseInt(row.qty || 0, 10);
+                const source = row.source;
+                if (!summary[name]) summary[name] = {};
+                summary[name].total = (summary[name].total || 0) + qty;
+                if (!summary[name][source]) summary[name][source] = 0;
+                summary[name][source] += qty;
+                sources.add(source);
+            });
+
+            const sourceArray = Array.from(sources).sort();
+            const excelData = Object.keys(summary).sort().map(name => {
+                const rowData = { "품목명": name, "합계": summary[name].total };
+                sourceArray.forEach(src => {
+                    rowData[src] = summary[name][src] || 0;
+                });
+                return rowData;
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            const wscols = [{ wch: 35 }, { wch: 12 }];
+            sourceArray.forEach(_ => wscols.push({ wch: 10 }));
+            ws["!cols"] = wscols;
+            XLSX.utils.book_append_sheet(wb, ws, "월매출요약");
+            XLSX.writeFile(wb, `SKY_${currentMonth}.xlsx`);
+        }
+
+        function exportSampleExcel() {
+            if (dbsamplehistory.length === 0) {
+                alert("AS/샘플 내역이 없습니다.");
+                return;
+            }
+
+            const summary = {};
+            dbsamplehistory.forEach(row => {
+                const name = row.name;
+                const dest = row.dest || "";
+                const qty = parseInt(row.qty || 0, 10);
+                if (!summary[name]) summary[name] = {};
+                if (!summary[name][dest]) summary[name][dest] = 0;
+                summary[name][dest] += qty;
+            });
+
+            const excelData = [];
+            Object.keys(summary).sort().forEach(name => {
+                Object.keys(summary[name]).sort().forEach(dest => {
+                    const remain = summary[name][dest];
+                    if (remain !== 0) {
+                        excelData.push({
+                            "품목명": name,
+                            "출고/반납처": dest,
+                            "잔여 수량": remain
+                        });
+                    }
+                });
+            });
+
+            if (excelData.length === 0) {
+                alert("잔여 샘플/AS 재고가 없습니다.");
+                return;
+            }
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.json_to_sheet(excelData);
+            ws["!cols"] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }];
+            XLSX.utils.book_append_sheet(wb, ws, "AS/샘플 재고");
+            XLSX.writeFile(wb, `SKY_${getToday()}.xlsx`);
+        }
+
+        function exportData() {
+            const blob = new Blob([JSON.stringify({
+                master: dbmaster,
+                map: dbmap,
+                history: dbhistory,
+                inHistory: dbinhistory,
+                sampleHistory: dbsamplehistory
+            }, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `sky_backup_${getToday()}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    saveStateForUndo();
+                    dbmaster = data.master || [];
+                    dbmap = data.map || [];
+                    dbhistory = data.history || [];
+                    dbinhistory = data.inHistory || [];
+                    dbsamplehistory = data.sampleHistory || [];
+                    await saveToCloud();
+                    addLog("백업 데이터를 불러와 저장했습니다.", "success");
+                } catch (err) {
+                    console.error(err);
+                    alert("백업 파일 형식이 올바르지 않습니다.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        window.onload = function() {
+            document.getElementById("loginOverlay").style.display = "flex";
+        };
+    </script>
 </body>
 </html>
