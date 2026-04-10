@@ -587,7 +587,7 @@
                         const cellVal = String(row[j] || '').replace(/\s/g, '');
                         
                         if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분/)) {
+                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분|협력사/)) {
                                 tIdx = j;
                             }
                         } 
