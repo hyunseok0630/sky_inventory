@@ -566,51 +566,54 @@
                 let failNames = new Set();
                 let parsedRows = 0;
 
-                let headerRowIdx = -1;
-                let titleColIdx = -1;
-                let qtyColIdx = -1;
-                let optColIdx = -1;
+                // ✅ 수정된 헤더 탐지 로직
+let headerRowIdx = -1;
+let titleColIdx = -1;
+let qtyColIdx = -1;
+let optColIdx = -1;
 
-                for (let i = 0; i < Math.min(30, rawData.length); i++) {
-                    const row = rawData[i];
-                    if(!row || row.length === 0) continue;
+for (let i = 0; i < Math.min(30, rawData.length); i++) {
+    const row = rawData[i];
+    if (!row || row.length === 0) continue;
 
-                    let filledCols = 0;
-                    for(let c = 0; c < row.length; c++) {
-                        if(row[c] !== undefined && String(row[c]).trim() !== "") filledCols++;
-                    }
-                    if (filledCols < 4) continue;
+    let tIdx = -1, oIdx = -1, qIdx = -1;
 
-                    let tIdx = -1, oIdx = -1, qIdx = -1;
+    for (let j = 0; j < row.length; j++) {
+        const cellVal = String(row[j] || '').replace(/\s/g, '');
 
-                    for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j] || '').replace(/\s/g, '');
-                        
-                        if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분|협력사/)) {
-                                tIdx = j;
-                            }
-                        } 
-                        else if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID/)) {
-                                oIdx = j;
-                            }
-                        } 
-                        else if (qIdx === -1 && cellVal.match(/수량|구매수|주문수/)) {
-                            if (!cellVal.match(/취소/)) {
-                                qIdx = j;
-                            }
-                        }
-                    }
-                    
-                    if (tIdx !== -1) {
-                        titleColIdx = tIdx;
-                        optColIdx = oIdx;
-                        qtyColIdx = qIdx;
-                        headerRowIdx = i;
-                        break;
-                    }
-                }
+        // ✅ else if → 독립 if 로 변경 (각 컬럼 독립적으로 체크)
+        if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
+            if (!cellVal.match(/번호|코드|순번|ID|여부|구분|협력사/)) {
+                tIdx = j;
+            }
+        }
+
+        if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
+            if (!cellVal.match(/번호|코드|순번|ID/)) {
+                oIdx = j;
+            }
+        }
+
+        // ✅ 수량 정규식 보완: "주문수량", "구매수량" 모두 커버
+        if (qIdx === -1 && cellVal.match(/^수량$|주문수량|구매수량|구매수|주문수/)) {
+            if (!cellVal.match(/취소/)) {
+                qIdx = j;
+            }
+        }
+    }
+
+    if (tIdx !== -1) {
+        titleColIdx = tIdx;
+        optColIdx = oIdx;
+        // ✅ 수량 컬럼 못 찾은 경우 로그 경고 추가
+        qtyColIdx = qIdx;
+        headerRowIdx = i;
+        if (qIdx === -1) {
+            addLog(`⚠️ 수량 컬럼을 찾지 못했습니다. 모든 수량이 1로 처리됩니다.`, 'warning');
+        }
+        break;
+    }
+}
 
                 if (titleColIdx === -1) {
                     addLog(`❌ 엑셀에서 '상품명/제품명' 기둥을 찾지 못했습니다.`, "danger");
