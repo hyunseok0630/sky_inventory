@@ -737,29 +737,44 @@ for (let i = 0; i < Math.min(30, rawData.length); i++) {
         document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
 
         const historyList = document.getElementById('historyContainer');
-        const grouped = db_history.reduce((acc, obj) => { 
-            acc[obj.date] = acc[obj.date] || {};
-            const safeName = obj.name === 'undefined' ? '알수없음' : obj.name;
-            acc[obj.date][safeName] = acc[obj.date][safeName] || {};
-            let s = obj.source || '기타';
-            acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
-            return acc; 
-        }, {});
 
-        let hHtml = "";
-        Object.keys(grouped).sort().reverse().forEach(date => {
-            hHtml += `<div class="history-day"><div class="history-date">${date}</div>`;
-            Object.keys(grouped[date]).forEach(name => {
-                let total = 0, tags = "";
-                Object.keys(grouped[date][name]).forEach(src => {
-                    total += grouped[date][name][src];
-                    tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span>`;
-                });
-                hHtml += `<div class="history-sales-row"><div class="history-sales-header"><span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span><b style="color:var(--secondary); white-space:nowrap;">총 ${total}</b></div><div class="history-sales-tags">${tags}</div></div>`;
-            });
-            hHtml += `</div>`;
+// ✅ 현재 월(YYYY-MM)에 해당하는 데이터만 필터링
+const currentMonth = getCurrentMonth(); // ex) "2026-04"
+const filteredHistory = db_history.filter(obj => 
+    String(obj.date).substring(0, 7) === currentMonth
+);
+
+const grouped = filteredHistory.reduce((acc, obj) => { 
+    acc[obj.date] = acc[obj.date] || {};
+    const safeName = obj.name === 'undefined' ? '알수없음' : obj.name;
+    acc[obj.date][safeName] = acc[obj.date][safeName] || {};
+    let s = obj.source || '기타';
+    acc[obj.date][safeName][s] = (acc[obj.date][safeName][s] || 0) + obj.qty;
+    return acc; 
+}, {});
+
+let hHtml = "";
+Object.keys(grouped).sort().reverse().forEach(date => {
+    hHtml += `<div class="history-day"><div class="history-date">${date}</div>`;
+    Object.keys(grouped[date]).sort().forEach(name => {
+        let total = 0, tags = "";
+        Object.keys(grouped[date][name]).forEach(src => {
+            total += grouped[date][name][src];
+            tags += `<span class="source-tag tag-${src}">${src} ${grouped[date][name][src]}</span>`;
         });
-        historyList.innerHTML = hHtml || "<div style='padding:10px; text-align:center;'>데이터 없음</div>";
+        hHtml += `<div class="history-sales-row">
+            <div class="history-sales-header">
+                <span style="flex:1; word-break:keep-all; padding-right:10px;">${name}</span>
+                <b style="color:var(--secondary); white-space:nowrap;">총 ${total}</b>
+            </div>
+            <div class="history-sales-tags">${tags}</div>
+        </div>`;
+    });
+    hHtml += `</div>`;
+});
+
+// ✅ 데이터 없을 때 현재 월 표시
+historyList.innerHTML = hHtml || `<div style='padding:10px; text-align:center; color:#999;'>${currentMonth} 판매 내역 없음</div>`;
 
         const sampleHistoryList = document.getElementById('sampleHistoryContainer');
         const groupedSample = db_sample_history.reduce((acc, obj) => { 
