@@ -658,7 +658,7 @@
     <div class="topbar">
         <div class="topbar-left">
             <div class="topbar-title">SKY Commerce 관리시스템</div>
-            <div class="topbar-sub">입력은 항상 당일 저장 / 조회는 선택 날짜 기준</div>
+            <div class="topbar-sub">입력은 항상 당일 저장 / 조회는 선택 기간 기준</div>
         </div>
         <div class="topbar-nav">
             <button class="nav-btn active" data-page-btn="page1" onclick="switchPage('page1')">1페이지 · 조회</button>
@@ -668,8 +668,10 @@
 
     <div class="backup-group">
         <div class="date-box">
-            <span>📅 조회 기준 날짜:</span>
-            <input type="date" id="baseDatePicker" onchange="handleDateChange()">
+            <span>📅 조회 기간:</span>
+            <input type="date" id="startDatePicker" onchange="handleDateRangeChange()">
+            <span>~</span>
+            <input type="date" id="endDatePicker" onchange="handleDateRangeChange()">
             <span id="currentDateDisp">-</span>
             <span class="date-note">※ 입력 반영일은 항상 오늘로 저장</span>
         </div>
@@ -706,8 +708,8 @@
                             <tr>
                                 <th>품목명</th>
                                 <th>단가</th>
-                                <th>입고(월)</th>
-                                <th>판매(일)</th>
+                                <th>입고(기간)</th>
+                                <th>판매(기간)</th>
                                 <th>현재고</th>
                                 <th>매출액</th>
                             </tr>
@@ -715,7 +717,7 @@
                         <tbody id="mainTable"></tbody>
                     </table>
 
-                    <div class="summary">선택일 매출 합계: <br><span id="totalSales">0</span>원</div>
+                    <div class="summary">선택 기간 매출 합계: <br><span id="totalSales">0</span>원</div>
                 </div>
             </div>
 
@@ -906,7 +908,7 @@
 <div id="lowStockModal" class="modal-overlay">
     <div class="modal-content" style="width:400px; max-height:80vh; display:flex; flex-direction:column;">
         <h3 style="color:var(--danger); width:100%; text-align:center; margin-top:0;">🚨 재고 경고 알림</h3>
-        <p style="font-size:13px; color:#666; text-align:center; margin-bottom:15px;">선택 날짜 기준 현재고가 최근 7일 판매량의 2배 이하인 품목입니다.</p>
+        <p style="font-size:13px; color:#666; text-align:center; margin-bottom:15px;">선택 종료일 기준 현재고가 최근 7일 판매량의 2배 이하인 품목입니다.</p>
         <div id="lowStockList" style="flex:1; overflow-y:auto; margin-bottom:15px; font-size:14px; line-height:1.6; border:1px solid #eee; border-radius:8px; padding:10px; background:#fafafa;"></div>
         <button class="btn" style="width:100%; background:var(--secondary); color:white; font-size:15px;" onclick="document.getElementById('lowStockModal').style.display='none'">확인 완료</button>
     </div>
@@ -925,7 +927,9 @@
     let backup_state = null;
     let authPin = "";
     let hasCheckedLowStock = false;
-    let selectedDate = "";
+    let selectedStartDate = "";
+    let selectedEndDate = "";
+    let currentMode = "";
 
     function toggleLoading(show) {
         document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none';
@@ -950,8 +954,19 @@
 
     function getToday() { return getPastDateStr(0); }
     function getCurrentMonth() { return getToday().substring(0, 7); }
-    function getViewDate() { return selectedDate || getToday(); }
     function getMonthFromDate(dateStr) { return String(dateStr).substring(0, 7); }
+
+    function getMonthStart(dateStr) {
+        return String(dateStr).substring(0, 8) + "01";
+    }
+
+    function getViewRange() {
+        const today = getToday();
+        return {
+            start: selectedStartDate || getMonthStart(today),
+            end: selectedEndDate || today
+        };
+    }
 
     function shiftDate(dateStr, diffDays) {
         const d = new Date(dateStr + "T00:00:00");
@@ -970,16 +985,28 @@
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    function handleDateChange() {
-        const picker = document.getElementById('baseDatePicker');
-        if (!picker || !picker.value) return;
-        selectedDate = picker.value;
-        document.getElementById('currentDateDisp').innerText = selectedDate;
+    function handleDateRangeChange() {
+        const startPicker = document.getElementById('startDatePicker');
+        const endPicker = document.getElementById('endDatePicker');
+        if (!startPicker || !endPicker || !startPicker.value || !endPicker.value) return;
+
+        let start = startPicker.value;
+        let end = endPicker.value;
+
+        if (start > end) [start, end] = [end, start];
+
+        selectedStartDate = start;
+        selectedEndDate = end;
+
+        startPicker.value = start;
+        endPicker.value = end;
+        document.getElementById('currentDateDisp').innerText = `${start} ~ ${end}`;
         render();
     }
 
     function addLog(msg, type='info') {
         const logArea = document.getElementById('actionLog');
+        if (!logArea) return;
         const now = new Date().toLocaleTimeString();
         const entry = document.createElement('div');
         entry.className = `log-entry log-${type}`;
@@ -998,7 +1025,8 @@
             adjustHistory: JSON.parse(JSON.stringify(db_adjust_history)),
             map: JSON.parse(JSON.stringify(db_map))
         };
-        document.getElementById('undoBtn').disabled = false;
+        const undoBtn = document.getElementById('undoBtn');
+        if (undoBtn) undoBtn.disabled = false;
     }
 
     function checkLogin() {
@@ -1137,9 +1165,13 @@
 
             if (needsSave) await saveToCloud();
 
-            selectedDate = selectedDate || today;
-            document.getElementById('currentDateDisp').innerText = selectedDate;
-            document.getElementById('baseDatePicker').value = selectedDate;
+            const monthStart = getMonthStart(today);
+            selectedStartDate = selectedStartDate || monthStart;
+            selectedEndDate = selectedEndDate || today;
+
+            document.getElementById('startDatePicker').value = selectedStartDate;
+            document.getElementById('endDatePicker').value = selectedEndDate;
+            document.getElementById('currentDateDisp').innerText = `${selectedStartDate} ~ ${selectedEndDate}`;
 
             backup_state = null;
             document.getElementById('undoBtn').disabled = true;
@@ -1187,20 +1219,21 @@
     }
 
     function checkLowStock(isManual = false) {
-        const viewDate = getViewDate();
+        const { end } = getViewRange();
+        const viewDate = end;
         const sevenDaysAgoStr = shiftDate(viewDate, -7);
 
         let weeklySales = {};
         db_history.forEach(h => {
             if (h.date >= sevenDaysAgoStr && h.date <= viewDate) {
-                weeklySales[h.name] = (weeklySales[h.name] || 0) + (parseInt(h.qty) || 0);
+                weeklySales[h.name] = (weeklySales[h.name] || 0) + parseInt(h.qty || 0);
             }
         });
 
         let alerts = [];
 
         db_master.forEach(item => {
-            if ((item.name || "").includes('반품')) return;
+            if ((item.name || '').includes('반품')) return;
 
             const cumulativeInToViewDate = db_in_history
                 .filter(h => h.name === item.name && h.date <= viewDate)
@@ -1214,18 +1247,13 @@
                 .filter(h => h.name === item.name && h.date <= viewDate)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const currentStock =
-                (item.initial || 0) +
-                cumulativeInToViewDate -
-                cumulativeSoldToViewDate -
-                cumulativeSampleNetToViewDate;
-
+            const currentStock = (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
             const recentSales = weeklySales[item.name] || 0;
 
             if (currentStock <= 0) {
-                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--danger); font-weight:bold;">${currentStock}개</span> <span style="color:var(--danger); font-size:12px;">(재고소진/품절)</span></div>`);
+                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br><span style="color:var(--danger); font-weight:bold;">${currentStock}개</span> <span style="color:var(--danger); font-size:12px;">(재고소진/품절)</span></div>`);
             } else if (recentSales > 0 && currentStock <= recentSales * 2) {
-                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br>잔여: <span style="color:var(--point); font-weight:bold;">${currentStock}개</span> <span style="color:#888; font-size:12px;">(최근7일판매: ${recentSales}개 / 안전재고: ${recentSales * 2}개)</span></div>`);
+                alerts.push(`<div style="padding:8px; border-bottom:1px solid #eee;"><b>${item.name}</b><br><span style="color:var(--point); font-weight:bold;">${currentStock}개</span> <span style="color:#888; font-size:12px;">(최근7일 판매: ${recentSales}개 / 안전재고: ${recentSales * 2}개)</span></div>`);
             }
         });
 
@@ -1233,7 +1261,7 @@
             document.getElementById('lowStockList').innerHTML = alerts.join('');
             document.getElementById('lowStockModal').style.display = 'block';
         } else if (isManual) {
-            alert("👍 선택한 조회 기준 날짜 기준으로 모든 품목의 재고가 충분합니다!");
+            alert("👍 현재 모든 품목의 재고가 충분합니다!");
         }
     }
 
@@ -1251,13 +1279,7 @@
     }
 
     function addAdjustHistoryToday(name, beforeQty, afterQty, memo) {
-        db_adjust_history.push({
-            date: getToday(),
-            name,
-            before: beforeQty,
-            after: afterQty,
-            memo: memo || ''
-        });
+        db_adjust_history.push({ date: getToday(), name, before: beforeQty, after: afterQty, memo: memo || "" });
     }
 
     function getCurrentStockByDate(itemName, viewDate) {
@@ -1281,21 +1303,17 @@
 
     function renderBulkEditList() {
         const wrap = document.getElementById('bulkEditList');
-        const viewDate = getViewDate();
-        const sorted = [...db_master].sort((a, b) => (a.name || "").localeCompare((b.name || ""), 'ko'));
+        const { end } = getViewRange();
+        const viewDate = end;
 
+        const sorted = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         wrap.innerHTML = sorted.map(item => {
             const currentStock = getCurrentStockByDate(item.name, viewDate);
             return `
                 <div class="bulk-edit-row ${currentStock <= 0 ? 'low-stock' : ''}">
                     <div class="bulk-edit-name">${item.name}</div>
-                    <div class="bulk-edit-stock">현재고 ${currentStock}</div>
-                    <input
-                        type="number"
-                        class="bulk-edit-input"
-                        data-item-name="${item.name}"
-                        data-current-stock="${currentStock}"
-                        placeholder="수정 수량">
+                    <div class="bulk-edit-stock">현재고: ${currentStock}</div>
+                    <input type="number" class="bulk-edit-input" data-item-name="${item.name}" data-current-stock="${currentStock}" placeholder="새 수량">
                 </div>
             `;
         }).join('');
@@ -1304,26 +1322,26 @@
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
-
         if (!file) {
-            alert("📂 엑셀 파일을 먼저 첨부해주세요!");
+            alert("엑셀 파일을 선택하세요!");
             return;
         }
 
         let source = "기타";
         const fileName = file.name.normalize('NFC');
 
-        if (fileName.toLowerCase().includes("직송주문")) source = "GS";
-        else if (fileName.includes("DeliveryList")) source = "쿠팡";
-        else if (fileName.includes("스마트스토어")) source = "네이버";
-        else if (fileName.toLowerCase().includes("compuzone")) source = "컴퓨존";
-        else if (fileName.toUpperCase().includes("SSG") || fileName.includes("협력업체출고대상")) source = "SSG";
-        else if (fileName.includes("allList") || fileName.toLowerCase().includes("11st")) source = "11번가";
+        if (fileName.toLowerCase().includes('gs')) source = "GS";
+        else if (fileName.includes('DeliveryList')) source = "쿠팡";
+        else if (fileName.includes('네이버')) source = "네이버";
+        else if (fileName.toLowerCase().includes('compuzone')) source = "컴퓨존";
+        else if (fileName.toUpperCase().includes('SSG') || fileName.includes('쓱')) source = "SSG";
+        else if (fileName.includes('allOrderList')) source = "11번가";
 
-        addLog(`파일 분석 시작: ${fileName} (${source})`);
-        addLog(`엑셀 반영일은 항상 오늘(${getToday()})로 저장됩니다.`, "info");
+        addLog(`${fileName} 분석 시작 → 플랫폼: ${source}`, "info");
+        addLog(`입력 반영일은 ${getToday()} 기준으로 저장됩니다.`, "info");
 
         const reader = new FileReader();
+
         reader.onload = async function(e) {
             try {
                 const data = new Uint8Array(e.target.result);
@@ -1344,26 +1362,25 @@
                     }
 
                     if (!foundKorean) {
-                        addLog("⚠️ '가짜 엑셀' 형식이 감지되어 자동 복구 모드로 전환합니다...", "warning");
-                        const textData = new TextDecoder("euc-kr").decode(data);
+                        addLog("한글이 깨진 것으로 보여 EUC-KR로 재시도합니다.", "warning");
+                        const textData = new TextDecoder('euc-kr').decode(data);
                         wb = XLSX.read(textData, { type: 'string' });
-                        sheet = wb.Sheets[wb.SheetNames[0]];
+                        let sheet = wb.Sheets[wb.SheetNames[0]];
                         rawData = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
                     }
                 } catch (err) {
-                    addLog("엑셀 파일을 해독하는 데 실패했습니다.", "danger");
+                    addLog("엑셀 파일을 읽지 못했습니다.", "danger");
                     return;
                 }
 
                 if (rawData.length === 0) {
-                    addLog("엑셀 파일이 비어있거나 형식 오류입니다.", "danger");
+                    addLog("엑셀 데이터가 비어 있습니다.", "danger");
                     return;
                 }
 
                 let applyCount = 0;
                 let failNames = new Set();
                 let parsedRows = 0;
-
                 let headerRowIdx = -1;
                 let titleColIdx = -1;
                 let qtyColIdx = -1;
@@ -1376,19 +1393,10 @@
                     let tIdx = -1, oIdx = -1, qIdx = -1;
 
                     for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j] || '').replace(/\s/g, '');
-
-                        if (tIdx === -1 && cellVal.match(/상품명|제품명|주문상품|단품명|품목명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID|여부|구분|협력사/)) tIdx = j;
-                        }
-
-                        if (oIdx === -1 && cellVal.match(/옵션|단품옵션|단품정보|옵션명/)) {
-                            if (!cellVal.match(/번호|코드|순번|ID/)) oIdx = j;
-                        }
-
-                        if (qIdx === -1 && cellVal.match(/^수량$|주문수량|구매수량|구매수|주문수/)) {
-                            if (!cellVal.match(/취소/)) qIdx = j;
-                        }
+                        const cellVal = String(row[j]).replace(/\s+/g, '');
+                        if (tIdx === -1 && cellVal.match(/상품명|주문상품명|품목명/) && !cellVal.match(/ID/)) tIdx = j;
+                        if (oIdx === -1 && cellVal.match(/옵션|옵션명/) && !cellVal.match(/ID/)) oIdx = j;
+                        if (qIdx === -1 && cellVal.match(/수량|주문수량/) && !cellVal.match(/금액/)) qIdx = j;
                     }
 
                     if (tIdx !== -1) {
@@ -1396,13 +1404,13 @@
                         optColIdx = oIdx;
                         qtyColIdx = qIdx;
                         headerRowIdx = i;
-                        if (qIdx === -1) addLog("⚠️ 수량 컬럼을 찾지 못했습니다. 모든 수량이 1로 처리됩니다.", "warning");
+                        if (qIdx === -1) addLog("수량 컬럼을 못 찾아 기본 1개로 반영합니다.", "warning");
                         break;
                     }
                 }
 
                 if (titleColIdx === -1) {
-                    addLog("❌ 엑셀에서 '상품명/제품명' 기둥을 찾지 못했습니다.", "danger");
+                    addLog("상품명 컬럼을 찾지 못했습니다.", "danger");
                     fileInput.value = "";
                     return;
                 }
@@ -1419,17 +1427,16 @@
                     if (!row) continue;
 
                     const rawTitle = row[titleColIdx];
-                    if (!rawTitle || String(rawTitle).trim() === "") continue;
-
+                    if (!rawTitle || !String(rawTitle).trim()) continue;
                     parsedRows++;
 
                     const title = String(rawTitle).trim();
-                    const opt = (optColIdx !== -1 && row[optColIdx]) ? String(row[optColIdx]).trim() : "";
-                    const fullTitle = opt ? `${title} [${opt}]` : title;
+                    const opt = optColIdx !== -1 && row[optColIdx] ? String(row[optColIdx]).trim() : "";
+                    const fullTitle = opt ? `${title} ${opt}` : title;
 
                     let qty = 1;
-                    if (qtyColIdx !== -1 && row[qtyColIdx]) {
-                        qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, '')) || 1;
+                    if (qtyColIdx !== -1 && row[qtyColIdx] !== "") {
+                        qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, "")) || 1;
                     }
 
                     let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle));
@@ -1442,14 +1449,14 @@
                             rule.targets.forEach(tName => {
                                 const item = db_master.find(masterItem => cleanStr(masterItem.name) === cleanStr(tName));
                                 if (item) {
-                                    item.sold += qty;
+                                    item.sold = (item.sold || 0) + qty;
                                     addHistoryToday(item.name, qty, source);
-                                    applyCount++;
+                                    applyCount += qty;
                                     appliedToItem = true;
                                 }
                             });
                         }
-                        if (!appliedToItem) failNames.add(`[매칭됨, 품목없음] ${fullTitle} 👉 연결대상: ${rule.targets.join(', ')}`);
+                        if (!appliedToItem) failNames.add(`${fullTitle} → ${rule.targets.join(', ')}`);
                     } else {
                         failNames.add(fullTitle);
                     }
@@ -1467,7 +1474,7 @@
                     document.getElementById('undoBtn').disabled = false;
 
                     await saveToCloud();
-                    addLog(`${applyCount}건의 데이터가 완벽하게 반영되었습니다.`, "success");
+                    addLog(`${applyCount}건 판매 반영 완료`, "success");
                 } else {
                     db_master = snapshot_master;
                     db_history = snapshot_history;
@@ -1475,18 +1482,18 @@
                     db_sample_history = snapshot_sample_history;
                     db_adjust_history = snapshot_adjust_history;
                     db_map = snapshot_map;
-                    addLog(`반영 0건. 미매칭 내역을 확인해주세요. (읽은 줄수: ${parsedRows})`, "warning");
+                    addLog(`판매 반영 0건. 분석 행 수: ${parsedRows}`, "warning");
                 }
 
                 if (failNames.size > 0) {
                     const failArr = Array.from(failNames);
-                    const displayFails = failArr.slice(0, 3).join(' | ');
-                    addLog(`[오류 내역]: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
+                    const displayFails = failArr.slice(0, 3).join(" / ");
+                    addLog(`매칭 실패: ${displayFails}${failArr.length > 3 ? ' ...' : ''}`, "danger");
                 }
 
                 fileInput.value = "";
             } catch (err) {
-                addLog("엑셀 파일을 읽는 도중 오류가 발생했습니다.", "danger");
+                addLog("엑셀 처리 실패: " + err.message, "danger");
             }
         };
 
@@ -1495,73 +1502,63 @@
 
     function render() {
         const table = document.getElementById('mainTable');
-        const search = (document.getElementById('inventorySearch')?.value || '').toLowerCase();
-
-        let dayTotalSales = 0;
-        const viewDate = getViewDate();
-        const currentMonth = getMonthFromDate(viewDate);
+        const search = document.getElementById('inventorySearch')?.value.toLowerCase() || "";
+        let rangeTotalSales = 0;
+        const { start, end } = getViewRange();
 
         const sortedMasterData = [...db_master]
-            .filter(i => (i.name || "").toLowerCase().includes(search))
+            .filter(i => (i.name || '').toLowerCase().includes(search))
             .sort((a, b) => (b.price || 0) - (a.price || 0));
 
         table.innerHTML = sortedMasterData.map(item => {
-            const inQtyOfMonth = db_in_history
-                .filter(h => h.name === item.name && String(h.date).substring(0, 7) === currentMonth)
+            const inQtyInRange = db_in_history
+                .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const cumulativeInToViewDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
+            const saleQtyInRange = db_history
+                .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const saleQtyOnViewDate = db_history
-                .filter(h => h.name === item.name && h.date === viewDate)
+            const cumulativeInToEndDate = db_in_history
+                .filter(h => h.name === item.name && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const cumulativeSoldToViewDate = db_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
+            const cumulativeSoldToEndDate = db_history
+                .filter(h => h.name === item.name && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const cumulativeSampleNetToViewDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
+            const cumulativeSampleNetToEndDate = db_sample_history
+                .filter(h => h.name === item.name && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const currentStock =
-                (item.initial || 0) +
-                cumulativeInToViewDate -
-                cumulativeSoldToViewDate -
-                cumulativeSampleNetToViewDate;
-
-            const salesAmount = saleQtyOnViewDate * (item.price || 0);
-            dayTotalSales += salesAmount;
+            const currentStock = (item.initial || 0) + cumulativeInToEndDate - cumulativeSoldToEndDate - cumulativeSampleNetToEndDate;
+            const salesAmount = saleQtyInRange * (item.price || 0);
+            rangeTotalSales += salesAmount;
 
             return `
                 <tr>
                     <td style="text-align:left"><b>${item.name || ''}</b></td>
                     <td>${(item.price || 0).toLocaleString()}</td>
-                    <td style="color:var(--accent); font-weight:bold;">${inQtyOfMonth}</td>
-                    <td style="color:var(--point); font-weight:bold;">${saleQtyOnViewDate}</td>
+                    <td style="color:var(--accent); font-weight:bold;">${inQtyInRange}</td>
+                    <td style="color:var(--point); font-weight:bold;">${saleQtyInRange}</td>
                     <td style="font-weight:bold;">${currentStock}</td>
                     <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
             `;
         }).join('');
 
-        document.getElementById('totalSales').innerText = dayTotalSales.toLocaleString();
+        document.getElementById('totalSales').innerText = rangeTotalSales.toLocaleString();
 
-        renderSalesHistory(currentMonth);
-        renderInHistory(currentMonth);
-        renderSampleHistory(currentMonth);
-        renderAdjustHistory(currentMonth);
+        renderSalesHistory(start, end);
+        renderInHistory(start, end);
+        renderSampleHistory(start, end);
+        renderAdjustHistory(start, end);
         renderSelectOptions();
     }
 
-    function renderSalesHistory(currentMonth) {
+    function renderSalesHistory(start, end) {
         const historyList = document.getElementById('historyContainer');
-
-        const filteredHistory = db_history.filter(obj =>
-            String(obj.date).substring(0, 7) === currentMonth
-        );
+        const filteredHistory = db_history.filter(obj => obj.date >= start && obj.date <= end);
 
         const grouped = filteredHistory.reduce((acc, obj) => {
             acc[obj.date] = acc[obj.date] || {};
@@ -1592,15 +1589,12 @@
             hHtml += `</div>`;
         });
 
-        historyList.innerHTML = hHtml || `<div style='padding:10px; text-align:center; color:#999;'>${currentMonth} 판매 내역 없음</div>`;
+        historyList.innerHTML = hHtml || `<div style='padding:10px; text-align:center; color:#999;'>${start} ~ ${end} 판매 내역 없음</div>`;
     }
 
-    function renderInHistory(currentMonth) {
+    function renderInHistory(start, end) {
         const inHistoryList = document.getElementById('inHistoryContainer');
-
-        const filteredIn = db_in_history.filter(obj =>
-            String(obj.date).substring(0, 7) === currentMonth
-        );
+        const filteredIn = db_in_history.filter(obj => obj.date >= start && obj.date <= end);
 
         const groupedIn = filteredIn.reduce((acc, obj) => {
             acc[obj.date] = acc[obj.date] || {};
@@ -1612,20 +1606,17 @@
         Object.keys(groupedIn).sort().reverse().forEach(date => {
             inHtml += `<div class="history-day history-day-in"><div class="history-date">${date}</div>`;
             Object.keys(groupedIn[date]).forEach(name => {
-                inHtml += `<div class="history-row"><span style="flex:1;">${name}</span><b style="color:var(--accent);">+${groupedIn[date][name]}개</b></div>`;
+                inHtml += `<div class="history-row"><span style="flex:1">${name}</span><b style="color:var(--accent)">${groupedIn[date][name]}</b></div>`;
             });
             inHtml += `</div>`;
         });
 
-        inHistoryList.innerHTML = inHtml || `<div style='padding:10px; text-align:center;'>${currentMonth} 입고 내역 없음</div>`;
+        inHistoryList.innerHTML = inHtml || `<div style='padding:10px; text-align:center;'>${start} ~ ${end} 입고 내역 없음</div>`;
     }
 
-    function renderSampleHistory(currentMonth) {
+    function renderSampleHistory(start, end) {
         const sampleHistoryList = document.getElementById('sampleHistoryContainer');
-
-        const filteredSample = db_sample_history.filter(obj =>
-            String(obj.date).substring(0, 7) === currentMonth
-        );
+        const filteredSample = db_sample_history.filter(obj => obj.date >= start && obj.date <= end);
 
         const groupedSample = filteredSample.reduce((acc, obj) => {
             acc[obj.date] = acc[obj.date] || {};
@@ -1646,19 +1637,20 @@
                 Object.keys(groupedSample[date][name]).forEach(key => {
                     let q = groupedSample[date][name][key];
                     if (q === 0) return;
-
                     total += q;
+
                     let dest = key.split('|||')[0];
                     let tagStyle = q < 0
-                        ? `background:#e8f5e9; color:var(--primary); border-color:#c8e6c9;`
-                        : `background:#f5eef8; color:var(--sample); border-color:#d7bde2;`;
+                        ? 'background:#e8f5e9; color:var(--primary); border-color:#c8e6c9;'
+                        : 'background:#f5eef8; color:var(--sample); border-color:#d7bde2;';
                     let qText = q < 0 ? `반납 ${-q}` : `출고 ${q}`;
+
                     tags += `<span class="source-tag" style="${tagStyle}">${dest} ${qText}</span>`;
                 });
 
                 if (total !== 0 || tags !== "") {
-                    let totalStyle = total < 0 ? `color:var(--primary);` : (total > 0 ? `color:var(--sample);` : `color:#888;`);
-                    let totalText = total < 0 ? `순반납 ${-total}` : (total > 0 ? `순출고 ${total}` : `변동 0`);
+                    let totalStyle = total < 0 ? 'color:var(--primary);' : total > 0 ? 'color:var(--sample);' : 'color:#888;';
+                    let totalText = total < 0 ? `순반납 ${-total}` : total > 0 ? `순출고 ${total}` : '0';
 
                     sHtml += `<div class="history-sales-row">
                         <div class="history-sales-header">
@@ -1672,15 +1664,12 @@
             sHtml += `</div>`;
         });
 
-        sampleHistoryList.innerHTML = sHtml || `<div style='padding:10px; text-align:center;'>${currentMonth} 샘플/교환/A/S 내역 없음</div>`;
+        sampleHistoryList.innerHTML = sHtml || `<div style='padding:10px; text-align:center;'>${start} ~ ${end} 샘플/교환/A/S 내역 없음</div>`;
     }
 
-    function renderAdjustHistory(currentMonth) {
+    function renderAdjustHistory(start, end) {
         const adjustHistoryList = document.getElementById('adjustHistoryContainer');
-
-        const filteredAdjust = db_adjust_history.filter(obj =>
-            String(obj.date).substring(0, 7) === currentMonth
-        );
+        const filteredAdjust = db_adjust_history.filter(obj => obj.date >= start && obj.date <= end);
 
         const groupedAdjust = filteredAdjust.reduce((acc, obj) => {
             acc[obj.date] = acc[obj.date] || [];
@@ -1698,26 +1687,25 @@
                             <span style="flex:1; font-weight:bold;">${row.name}</span>
                             <b style="color:var(--adjust); white-space:nowrap;">${row.before} → ${row.after}</b>
                         </div>
-                        <div style="font-size:12px; color:#666;">
-                            ${row.memo ? `사유: ${row.memo}` : '사유 없음'}
-                        </div>
+                        <div style="font-size:12px; color:#666;">${row.memo ? row.memo : '-'}</div>
                     </div>
                 `;
             });
             aHtml += `</div>`;
         });
 
-        adjustHistoryList.innerHTML = aHtml || `<div style='padding:10px; text-align:center;'>${currentMonth} 재고 조정 내역 없음</div>`;
+        adjustHistoryList.innerHTML = aHtml || `<div style='padding:10px; text-align:center;'>${start} ~ ${end} 재고 조정 내역 없음</div>`;
     }
 
     function renderSelectOptions() {
-        const sortedItemsForDropdown = [...db_master].sort((a, b) => (a.name || "").localeCompare((b.name || ""), 'ko'));
+        const sortedItemsForDropdown = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
 
-        document.getElementById('directItemSelect').innerHTML = optionsHtml;
-        document.getElementById('sampleItemSelect').innerHTML = optionsHtml;
-        document.getElementById('asItemSelect').innerHTML = optionsHtml;
-        document.getElementById('sampleInItemSelect').innerHTML = optionsHtml;
+        const ids = ['directItemSelect', 'sampleItemSelect', 'asItemSelect', 'sampleInItemSelect', 'actionItemSelect'];
+        ids.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = optionsHtml;
+        });
 
         document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown
             .map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`)
@@ -1730,12 +1718,11 @@
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ddd; padding:8px 0;">
                 <div style="flex:1; word-break:keep-all;">
                     <b>${m.exName}</b><br>
-                    <span style="color:var(--primary); font-weight:bold;">👉 ${m.targets.length > 0 ? m.targets.join(', ') : '<span style="color:red;">연결품목 없음(오류)</span>'}</span>
+                    <span style="color:var(--primary); font-weight:bold;">${m.targets.length > 0 ? m.targets.join(', ') : ''}</span>
                 </div>
                 <button class="btn" style="background:var(--danger); color:white; padding:6px 10px;" onclick="deleteMap(${i})">삭제</button>
             </div>
-        `).join('') || "<div style='text-align:center; padding:20px;'>저장된 매칭 규칙이 없습니다.</div>";
-
+        `).join('') || `<div style="text-align:center; padding:20px;">등록된 매칭 규칙이 없습니다.</div>`;
         document.getElementById('mapModal').style.display = 'block';
     }
 
@@ -1759,41 +1746,38 @@
         document.getElementById('mgmtModal').style.display = 'none';
     }
 
-    let currentMode = '';
-
     function openActionModal(mode) {
         currentMode = mode;
         closeMgmtModal();
 
         const select = document.getElementById('actionItemSelect');
-        const sorted = [...db_master].sort((a, b) => (a.name || "").localeCompare((b.name || ""), 'ko'));
+        const sorted = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         select.innerHTML = sorted.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
 
-        document.getElementById('singleActionArea').style.display = (mode === 'edit' ? 'none' : 'block');
-        document.getElementById('bulkEditArea').style.display = (mode === 'edit' ? 'block' : 'none');
-        document.getElementById('qtyInputArea').style.display = (mode === 'del' ? 'none' : 'block');
-        document.getElementById('deleteConfirmMsg').style.display = (mode === 'del' ? 'block' : 'none');
-        document.getElementById('adjustMemoArea').style.display = (mode === 'edit' ? 'block' : 'none');
-
+        document.getElementById('singleActionArea').style.display = mode === 'edit' ? 'none' : 'block';
+        document.getElementById('bulkEditArea').style.display = mode === 'edit' ? 'block' : 'none';
+        document.getElementById('qtyInputArea').style.display = mode === 'del' ? 'none' : 'block';
+        document.getElementById('deleteConfirmMsg').style.display = mode === 'del' ? 'block' : 'none';
+        document.getElementById('adjustMemoArea').style.display = mode === 'edit' ? 'block' : 'none';
         document.getElementById('actionQty').value = 0;
         document.getElementById('adjustMemo').value = '';
 
         const confirmBtn = document.getElementById('actionConfirmBtn');
 
         if (mode === 'in') {
-            document.getElementById('actionTitle').innerText = "📦 입고 수량 추가";
-            document.getElementById('qtyLabel').innerText = "추가할 입고량";
-            confirmBtn.innerText = "입고하기";
-            confirmBtn.style.background = 'var(--primary)';
+            document.getElementById('actionTitle').innerText = "입고 수량 추가";
+            document.getElementById('qtyLabel').innerText = "입고 수량";
+            confirmBtn.innerText = "입고 반영";
+            confirmBtn.style.background = "var(--primary)";
         } else if (mode === 'edit') {
-            document.getElementById('actionTitle').innerText = "✏️ 재고 수량 일괄 수정";
-            confirmBtn.innerText = "일괄 수정하기";
-            confirmBtn.style.background = 'var(--adjust)';
+            document.getElementById('actionTitle').innerText = "재고 수량 수정 (실사조정)";
+            confirmBtn.innerText = "재고 수정 반영";
+            confirmBtn.style.background = "var(--adjust)";
             renderBulkEditList();
         } else {
-            document.getElementById('actionTitle').innerText = "❌ 품목 삭제";
-            confirmBtn.innerText = "삭제하기";
-            confirmBtn.style.background = 'var(--danger)';
+            document.getElementById('actionTitle').innerText = "품목 삭제";
+            confirmBtn.innerText = "삭제 실행";
+            confirmBtn.style.background = "var(--danger)";
         }
 
         confirmBtn.onclick = processMgmtAction;
@@ -1808,15 +1792,16 @@
         if (currentMode === 'edit') {
             const inputs = Array.from(document.querySelectorAll('.bulk-edit-input'));
             const memo = document.getElementById('adjustMemo').value.trim();
-            const viewDate = getViewDate();
+            const { end } = getViewRange();
+            const viewDate = end;
 
             const changes = inputs
                 .map(input => {
                     const raw = input.value.trim();
-                    if (raw === '') return null;
+                    if (raw === "") return null;
 
                     const name = input.dataset.itemName;
-                    const beforeQty = parseInt(input.dataset.currentStock || '0', 10);
+                    const beforeQty = parseInt(input.dataset.currentStock || 0, 10);
                     const afterQty = parseInt(raw, 10);
 
                     if (isNaN(afterQty)) return null;
@@ -1827,7 +1812,7 @@
                 .filter(Boolean);
 
             if (changes.length === 0) {
-                alert("수정할 수량을 1개 이상 입력해주세요.");
+                alert("변경할 재고 수량을 1개 이상 입력하세요.");
                 return;
             }
 
@@ -1849,20 +1834,18 @@
                     .filter(h => h.name === change.name && h.date <= viewDate)
                     .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-                db_master[idx].initial =
-                    change.afterQty - cumulativeInToViewDate + cumulativeSoldToViewDate + cumulativeSampleNetToViewDate;
-
+                db_master[idx].initial = change.afterQty - cumulativeInToViewDate + cumulativeSoldToViewDate + cumulativeSampleNetToViewDate;
                 addAdjustHistoryToday(change.name, change.beforeQty, change.afterQty, memo);
             });
 
             await saveToCloud();
-            addLog(`재고 수량 ${changes.length}건 일괄 수정 완료`, "success");
+            addLog(`${changes.length}개 품목 재고 수정 완료`, "success");
             closeActionModal();
             return;
         }
 
         const itemName = document.getElementById('actionItemSelect').value;
-        const qty = parseInt(document.getElementById('actionQty').value) || 0;
+        const qty = parseInt(document.getElementById('actionQty').value || 0);
         const idx = db_master.findIndex(i => i.name === itemName);
         if (idx === -1) return;
 
@@ -1871,12 +1854,14 @@
         if (currentMode === 'in') {
             db_master[idx].inQty = (db_master[idx].inQty || 0) + qty;
             addInHistoryToday(itemName, qty);
+            await saveToCloud();
+            addLog(`${itemName} 입고 ${qty}개 반영`, "success");
         } else if (currentMode === 'del') {
             db_master.splice(idx, 1);
+            await saveToCloud();
+            addLog(`${itemName} 품목 삭제 완료`, "success");
         }
 
-        await saveToCloud();
-        addLog(`관리 완료: ${itemName}`, "success");
         closeActionModal();
     }
 
@@ -1885,18 +1870,18 @@
         if (!name) return;
 
         saveStateForUndo();
-
         db_master.push({
             name,
-            price: parseInt(document.getElementById('mPrice').value) || 0,
-            initial: parseInt(document.getElementById('mQty').value) || 0,
+            price: parseInt(document.getElementById('mPrice').value || 0, 10),
+            initial: parseInt(document.getElementById('mQty').value || 0, 10),
             sold: 0,
             inQty: 0,
             sampleQty: 0
         });
 
         await saveToCloud();
-        addLog(`신규 등록: ${name}`, "info");
+        addLog(`${name} 신규 품목 추가`, "info");
+
         document.getElementById('mName').value = "";
         document.getElementById('mPrice').value = 0;
         document.getElementById('mQty').value = 0;
@@ -1904,60 +1889,60 @@
 
     async function applyDirectSale() {
         const name = document.getElementById('directItemSelect').value;
-        const qty = parseInt(document.getElementById('directQty').value) || 0;
-        const source = document.getElementById('directSource').value || "기타";
+        const qty = parseInt(document.getElementById('directQty').value || 0, 10);
+        const source = document.getElementById('directSource').value;
 
         const item = db_master.find(i => i.name === name);
         if (item && qty > 0) {
             saveStateForUndo();
-            item.sold += qty;
+            item.sold = (item.sold || 0) + qty;
             addHistoryToday(name, qty, source);
             await saveToCloud();
-            addLog(`🛒 판매 반영: ${name} ${qty}개 (${source})`, "success");
+            addLog(`${name} 판매 ${qty}개 (${source})`, "success");
         }
     }
 
     async function applySample() {
         const name = document.getElementById('sampleItemSelect').value;
-        const qty = parseInt(document.getElementById('sampleQty').value) || 0;
-        const dest = document.getElementById('sampleDest').value.trim() || "기타(미상)";
+        const qty = parseInt(document.getElementById('sampleQty').value || 0, 10);
+        const dest = document.getElementById('sampleDest').value.trim() || '기타';
 
         const item = db_master.find(i => i.name === name);
         if (item && qty > 0) {
             saveStateForUndo();
             addSampleHistoryToday(name, qty, dest);
             await saveToCloud();
-            addLog(`🎁 샘플 출고: ${name} ${qty}개 (${dest})`, "info");
+            addLog(`${name} 샘플 출고 ${qty}개 (${dest})`, "info");
         }
     }
 
     async function applyAS() {
         const name = document.getElementById('asItemSelect').value;
-        const qty = parseInt(document.getElementById('asQty').value) || 0;
+        const qty = parseInt(document.getElementById('asQty').value || 0, 10);
         const type = document.getElementById('asTypeSelect').value;
-        const reason = document.getElementById('asDest').value.trim() || "기타사유";
-        const dest = `[${type}] ${reason}`;
+        const reason = document.getElementById('asDest').value.trim();
+        const dest = reason ? `${type} / ${reason}` : type;
 
         const item = db_master.find(i => i.name === name);
         if (item && qty > 0) {
             saveStateForUndo();
             addSampleHistoryToday(name, qty, dest);
             await saveToCloud();
-            addLog(`🛠️ ${type} 출고: ${name} ${qty}개 (${reason})`, "info");
+            addLog(`${type} 출고 ${name} ${qty}개 (${reason || '사유 없음'})`, "info");
         }
     }
 
     async function applySampleIn() {
         const name = document.getElementById('sampleInItemSelect').value;
-        const qty = parseInt(document.getElementById('sampleInQty').value) || 0;
-        const dest = document.getElementById('sampleInDest').value.trim() || "기타(반납/회수)";
+        const qty = parseInt(document.getElementById('sampleInQty').value || 0, 10);
+        const dest = document.getElementById('sampleInDest').value.trim() || '반납';
 
         const item = db_master.find(i => i.name === name);
         if (item && qty > 0) {
             saveStateForUndo();
             addSampleHistoryToday(name, -qty, dest);
             await saveToCloud();
-            addLog(`🔄 재고 회복: ${name} ${qty}개 (${dest})`, "success");
+            addLog(`${name} 반납 ${qty}개 (${dest})`, "success");
         }
     }
 
@@ -1966,25 +1951,26 @@
         const targets = Array.from(document.querySelectorAll('.chk:checked')).map(c => c.value.trim());
 
         if (!exName || targets.length === 0) {
-            alert("연결할 내부 품목을 체크해주세요!");
+            alert("엑셀 상품명과 매칭 대상 품목을 선택하세요!");
             return;
         }
 
         saveStateForUndo();
-
         db_map.push({ exName, targets });
         await saveToCloud();
-        addLog(`규칙 추가: ${exName}`, "info");
+        addLog(`매칭 저장: ${exName}`, "info");
+
         document.getElementById('exName').value = "";
         document.querySelectorAll('.chk:checked').forEach(c => c.checked = false);
     }
 
     function exportMonthlySalesExcel() {
-        const currentMonth = getMonthFromDate(getViewDate());
+        const { end } = getViewRange();
+        const currentMonth = getMonthFromDate(end);
         const monthlyData = db_history.filter(h => h.date.startsWith(currentMonth));
 
         if (monthlyData.length === 0) {
-            alert("선택 월 판매 내역이 없습니다.");
+            alert("선택 종료일 기준 월 판매내역이 없습니다.");
             return;
         }
 
@@ -1993,51 +1979,44 @@
 
         monthlyData.forEach(row => {
             const name = row.name;
-            const qty = parseInt(row.qty) || 0;
-            const source = row.source || "기타";
+            const qty = parseInt(row.qty || 0);
+            const source = row.source || '기타';
 
-            if (!summary[name]) summary[name] = { "총 판매수량": 0 };
-            summary[name]["총 판매수량"] += qty;
-
+            if (!summary[name]) summary[name] = {};
+            summary[name].total = (summary[name].total || 0) + qty;
             if (!summary[name][source]) summary[name][source] = 0;
             summary[name][source] += qty;
-
             sources.add(source);
         });
 
         const sourceArray = Array.from(sources).sort();
 
         const excelData = Object.keys(summary).sort().map(name => {
-            const rowData = { "품목명": name, "총 판매수량": summary[name]["총 판매수량"] };
-            sourceArray.forEach(src => {
-                rowData[src] = summary[name][src] || 0;
-            });
+            const rowData = { 품목명: name, 총합계: summary[name].total };
+            sourceArray.forEach(src => rowData[src] = summary[name][src] || 0);
             return rowData;
         });
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
-
-        const wscols = [{wch: 35}, {wch: 12}];
-        sourceArray.forEach(() => wscols.push({wch: 10}));
+        const wscols = [{ wch: 35 }, { wch: 12 }];
+        sourceArray.forEach(() => wscols.push({ wch: 10 }));
         ws['!cols'] = wscols;
-
-        XLSX.utils.book_append_sheet(wb, ws, "월간 판매 요약");
-        XLSX.writeFile(wb, `SKY_월간판매요약_${currentMonth}.xlsx`);
+        XLSX.utils.book_append_sheet(wb, ws, "판매내역");
+        XLSX.writeFile(wb, `SKY_판매내역_${currentMonth}.xlsx`);
     }
 
     function exportSampleExcel() {
         if (db_sample_history.length === 0) {
-            alert("샘플/교환/AS 출고 내역이 없습니다.");
+            alert("샘플/A/S 내역이 없습니다.");
             return;
         }
 
         const summary = {};
-
         db_sample_history.forEach(row => {
             const name = row.name;
-            const dest = row.dest || "기타";
-            const qty = parseInt(row.qty) || 0;
+            const dest = row.dest || '기타';
+            const qty = parseInt(row.qty || 0);
 
             if (!summary[name]) summary[name] = {};
             if (!summary[name][dest]) summary[name][dest] = 0;
@@ -2050,25 +2029,24 @@
                 const remain = summary[name][dest];
                 if (remain > 0) {
                     excelData.push({
-                        "품목명": name,
-                        "제공처/고객명": dest,
-                        "미반납(나가있는) 수량": remain
+                        품목명: name,
+                        제공처: dest,
+                        미반납수량: remain
                     });
                 }
             });
         });
 
         if (excelData.length === 0) {
-            alert("현재 외부에 나가있는(미반납된) 재고가 없습니다!");
+            alert("현재 미반납 항목이 없습니다!");
             return;
         }
 
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(excelData);
-        ws['!cols'] = [{wch: 35}, {wch: 25}, {wch: 15}];
-
-        XLSX.utils.book_append_sheet(wb, ws, "미반납 현황");
-        XLSX.writeFile(wb, `SKY_샘플_교환_현황_${getToday()}.xlsx`);
+        ws['!cols'] = [{ wch: 35 }, { wch: 25 }, { wch: 15 }];
+        XLSX.utils.book_append_sheet(wb, ws, "미반납현황");
+        XLSX.writeFile(wb, `SKY_미반납현황_${getToday()}.xlsx`);
     }
 
     function exportData() {
@@ -2083,7 +2061,7 @@
         };
 
         const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = `SKY_backup_${getToday()}.json`;
         a.click();
@@ -2094,7 +2072,7 @@
         const file = event.target.files[0];
         if (!file) return;
 
-        if (!confirm("현재 데이터를 백업 파일 내용으로 덮어씁니다. 계속할까요?")) {
+        if (!confirm("현재 데이터를 덮어쓰고 백업 파일로 복구할까요?")) {
             event.target.value = "";
             return;
         }
@@ -2115,7 +2093,7 @@
             await saveToCloud();
             addLog("백업 복구 완료", "success");
         } catch (e) {
-            alert("백업 파일을 읽는 중 오류가 발생했습니다.");
+            alert("백업 파일 복구 실패");
             console.error(e);
         }
 
