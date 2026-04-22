@@ -487,6 +487,21 @@
             width: 100%;
         }
 
+        .multi-sale-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .multi-sale-row input,
+        .multi-sale-row select,
+        .multi-sale-row button {
+            margin: 0;
+            height: 42px;
+            width: 100%;
+        }
+
         .inventory-header {
             display: flex;
             justify-content: space-between;
@@ -626,6 +641,7 @@
             .search-box { max-width: 100%; }
 
             .action-row { flex-direction: column; }
+            .multi-sale-row { flex-direction: column; }
 
             .modal-content {
                 width: calc(100% - 24px) !important;
@@ -792,23 +808,11 @@
                     </div>
 
                     <div style="font-weight:bold; color:var(--point); margin-bottom:8px; font-size:13px;">🛒 판매 반영 (당일 저장 / 매출포함 / 재고차감)</div>
-                    <div class="action-row">
-                        <select id="directItemSelect" style="flex:2;"></select>
-                        <input type="number" id="directQty" value="1" min="1" style="flex:1;">
-                        <select id="directSource" style="flex:1.5;">
-                            <option value="세미트론">세미트론</option>
-                            <option value="쿠팡">쿠팡</option>
-                            <option value="네이버">네이버</option>
-                            <option value="컴퓨존">컴퓨존</option>
-                            <option value="SSG">SSG</option>
-                            <option value="라운즈">라운즈</option>
-                            <option value="금양">금양</option>
-                            <option value="GS">GS</option>
-                            <option value="11번가">11번가</option>
-                            <option value="M몰">M몰</option>
-                            <option value="기타">기타</option>
-                        </select>
-                        <button class="btn" style="background:var(--point); color:white; flex:1;" onclick="applyDirectSale()">반영</button>
+                    <div id="multiSaleRows"></div>
+
+                    <div class="action-row" style="margin-top:10px;">
+                        <button class="btn" style="background:#636e72; color:white; flex:1;" onclick="addSaleRow()">+ 행 추가</button>
+                        <button class="btn" style="background:var(--point); color:white; flex:2;" onclick="applyMultiDirectSale()">일괄 판매 반영</button>
                     </div>
 
                     <div class="action-row">
@@ -1321,6 +1325,54 @@
         }).join('');
     }
 
+    function getSortedItemsForDropdown() {
+        return [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
+    }
+
+    function getItemOptionsHtml(selectedName = '') {
+        return getSortedItemsForDropdown()
+            .map(i => `<option value="${i.name}" ${i.name === selectedName ? 'selected' : ''}>${i.name}</option>`)
+            .join('');
+    }
+
+    function getSourceOptionsHtml(selectedSource = '') {
+        const sources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "기타"];
+        return sources.map(src => `<option value="${src}" ${src === selectedSource ? 'selected' : ''}>${src}</option>`).join('');
+    }
+
+    function addSaleRow(defaults = {}) {
+        const wrap = document.getElementById('multiSaleRows');
+        if (!wrap) return;
+
+        const row = document.createElement('div');
+        row.className = 'multi-sale-row';
+        row.innerHTML = `
+            <select class="multi-sale-item" style="flex:2;">
+                ${getItemOptionsHtml(defaults.name || '')}
+            </select>
+            <input type="number" class="multi-sale-qty" value="${defaults.qty || 1}" min="1" style="flex:1;" placeholder="수량">
+            <select class="multi-sale-source" style="flex:1.5;">
+                ${getSourceOptionsHtml(defaults.source || '세미트론')}
+            </select>
+            <button class="btn" style="background:var(--danger); color:white; flex:0.7;" onclick="removeSaleRow(this)">삭제</button>
+        `;
+        wrap.appendChild(row);
+    }
+
+    function removeSaleRow(btn) {
+        const wrap = document.getElementById('multiSaleRows');
+        if (!wrap) return;
+        btn.parentElement.remove();
+        if (wrap.children.length === 0) addSaleRow();
+    }
+
+    function initMultiSaleRows() {
+        const wrap = document.getElementById('multiSaleRows');
+        if (!wrap) return;
+        wrap.innerHTML = '';
+        addSaleRow();
+    }
+
     function loadExcel() {
         const fileInput = document.getElementById('exFile');
         const file = fileInput.files[0];
@@ -1703,15 +1755,23 @@
         const sortedItemsForDropdown = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
 
-        const ids = ['directItemSelect', 'sampleItemSelect', 'asItemSelect', 'sampleInItemSelect', 'actionItemSelect'];
+        const ids = ['sampleItemSelect', 'asItemSelect', 'sampleInItemSelect', 'actionItemSelect'];
         ids.forEach(id => {
             const el = document.getElementById(id);
             if (el) el.innerHTML = optionsHtml;
         });
 
-        document.getElementById('itemChecks').innerHTML = sortedItemsForDropdown
-            .map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`)
-            .join('');
+        const itemChecks = document.getElementById('itemChecks');
+        if (itemChecks) {
+            itemChecks.innerHTML = sortedItemsForDropdown
+                .map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`)
+                .join('');
+        }
+
+        const multiSaleRows = document.getElementById('multiSaleRows');
+        if (multiSaleRows && multiSaleRows.children.length === 0) {
+            initMultiSaleRows();
+        }
     }
 
     function openMapModal() {
@@ -1889,19 +1949,49 @@
         document.getElementById('mQty').value = 0;
     }
 
-    async function applyDirectSale() {
-        const name = document.getElementById('directItemSelect').value;
-        const qty = parseInt(document.getElementById('directQty').value || 0, 10);
-        const source = document.getElementById('directSource').value;
+    async function applyMultiDirectSale() {
+        const rows = Array.from(document.querySelectorAll('.multi-sale-row'));
 
-        const item = db_master.find(i => i.name === name);
-        if (item && qty > 0) {
-            saveStateForUndo();
-            item.sold = (item.sold || 0) + qty;
-            addHistoryToday(name, qty, source);
-            await saveToCloud();
-            addLog(`${name} 판매 ${qty}개 (${source})`, "success");
+        const entries = rows.map(row => {
+            const name = row.querySelector('.multi-sale-item')?.value || '';
+            const qty = parseInt(row.querySelector('.multi-sale-qty')?.value || 0, 10);
+            const source = row.querySelector('.multi-sale-source')?.value || '기타';
+            return { name, qty, source };
+        }).filter(entry => entry.name && entry.qty > 0);
+
+        if (entries.length === 0) {
+            alert("판매 반영할 품목을 1개 이상 입력하세요.");
+            return;
         }
+
+        saveStateForUndo();
+
+        let appliedRowCount = 0;
+        let appliedQtyCount = 0;
+
+        entries.forEach(({ name, qty, source }) => {
+            const item = db_master.find(i => i.name === name);
+            if (!item) return;
+
+            item.sold = (item.sold || 0) + qty;
+            addHistoryToday(name, qty, source || '기타');
+
+            appliedRowCount += 1;
+            appliedQtyCount += qty;
+        });
+
+        if (appliedRowCount === 0) {
+            alert("반영 가능한 품목이 없습니다.");
+            return;
+        }
+
+        await saveToCloud();
+        addLog(`${appliedRowCount}개 항목 판매 반영 완료 / 총 ${appliedQtyCount}개`, "success");
+        initMultiSaleRows();
+    }
+
+    async function applyDirectSale() {
+        await applyMultiDirectSale();
     }
 
     async function applySample() {
