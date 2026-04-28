@@ -1159,6 +1159,11 @@
 
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => {
+                    const pendingSamples = db_sample_history
+                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
+                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
+
+                    i.initial = i.initial - i.sold - pendingSamples;
                     i.sold = 0;
                 });
                 needsSave = true;
@@ -1236,7 +1241,19 @@
         db_master.forEach(item => {
             if ((item.name || '').includes('반품')) return;
 
-            const currentStock = calcCurrentStock(item.name, viewDate);
+            const cumulativeInToViewDate = db_in_history
+                .filter(h => h.name === item.name && h.date <= viewDate)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const cumulativeSoldToViewDate = db_history
+                .filter(h => h.name === item.name && h.date <= viewDate)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const cumulativeSampleNetToViewDate = db_sample_history
+                .filter(h => h.name === item.name && h.date <= viewDate)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const currentStock = (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
             const recentSales = weeklySales[item.name] || 0;
 
             if (currentStock <= 0) {
@@ -1267,39 +1284,37 @@
         db_sample_history.push({ date: getToday(), name, qty, dest });
     }
 
+    function parseExcelQty(value) {
+        if (value === null || value === undefined || value === '') return 1;
+        if (typeof value === 'number' && Number.isFinite(value)) return Math.max(1, Math.round(value));
+
+        const str = String(value).trim();
+        const match = str.match(/-?\d+(\.\d+)?/);
+        if (!match) return 1;
+        return Math.max(1, Math.round(Number(match[0])));
+    }
+
     function addAdjustHistoryToday(name, beforeQty, afterQty, memo) {
         db_adjust_history.push({ date: getToday(), name, before: beforeQty, after: afterQty, memo: memo || "" });
     }
 
-    function calcCurrentStock(itemName, viewDate) {
+    function getCurrentStockByDate(itemName, viewDate) {
         const item = db_master.find(i => i.name === itemName);
         if (!item) return 0;
 
         const cumulativeInToViewDate = db_in_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
+            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
         const cumulativeSoldToViewDate = db_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
+            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
         const cumulativeSampleNetToViewDate = db_sample_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
+            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-        const cumulativeAdjustDeltaToViewDate = db_adjust_history
-            .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + (Number(h.after || 0) - Number(h.before || 0)), 0);
-
-        return Number(item.initial || 0)
-            + cumulativeInToViewDate
-            - cumulativeSoldToViewDate
-            - cumulativeSampleNetToViewDate
-            + cumulativeAdjustDeltaToViewDate;
-    }
-
-    function getCurrentStockByDate(itemName, viewDate) {
-        return calcCurrentStock(itemName, viewDate);
+        return (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
     }
 
     function renderBulkEditList() {
@@ -1442,10 +1457,34 @@
                     let tIdx = -1, oIdx = -1, qIdx = -1;
 
                     for (let j = 0; j < row.length; j++) {
-                        const cellVal = String(row[j]).replace(/\s+/g, '');
-                        if (tIdx === -1 && cellVal.match(/상품명|주문상품명|품목명/) && !cellVal.match(/ID/)) tIdx = j;
-                        if (oIdx === -1 && cellVal.match(/옵션|옵션명/) && !cellVal.match(/ID/)) oIdx = j;
-                        if (qIdx === -1 && cellVal.match(/수량|주문수량/) && !cellVal.match(/금액/)) qIdx = j;
+                        const normalizedCell = String(row[j] ?? '').replace(/\s+/g, '').toLowerCase();
+
+                        // 상품명: 정확한 상품명 계열만, 번호/주문번호는 제외
+                        if (
+                            tIdx === -1 &&
+                            /상품명|주문상품명|품목명/.test(normalizedCell) &&
+                            !/주문번호|상품주문번호|상품번호|주문id|주문코드|상품id/.test(normalizedCell)
+                        ) {
+                            tIdx = j;
+                        }
+
+                        // 옵션: 옵션 관련 컬럼
+                        if (
+                            oIdx === -1 &&
+                            /옵션|옵션명|옵션정보|상품옵션|주문옵션/.test(normalizedCell) &&
+                            !/id|코드/.test(normalizedCell)
+                        ) {
+                            oIdx = j;
+                        }
+
+                        // 수량: 다양한 수량 표현 허용
+                        if (
+                            qIdx === -1 &&
+                            /주문수량|상품수량|구매수량|수량개|수량|주문개수|구매개수|개수|ea|qty/.test(normalizedCell) &&
+                            !/금액|가격|단가|재고|옵션관리코드/.test(normalizedCell)
+                        ) {
+                            qIdx = j;
+                        }
                     }
 
                     if (tIdx !== -1) {
@@ -1453,7 +1492,14 @@
                         optColIdx = oIdx;
                         qtyColIdx = qIdx;
                         headerRowIdx = i;
-                        if (qIdx === -1) addLog("수량 컬럼을 못 찾아 기본 1개로 반영합니다.", "warning");
+
+                        // 네이버 스마트스토어 주문 엑셀: 실제 수량은 AA열(27번째 컬럼)에 고정
+                        if (source === "네이버") {
+                            qtyColIdx = 26; // A=0 ... Z=25, AA=26
+                        }
+
+                        addLog(`헤더 감지 → 상품명:${titleColIdx + 1}열 / 옵션:${optColIdx !== -1 ? optColIdx + 1 : '-'}열 / 수량:${qtyColIdx !== -1 ? qtyColIdx + 1 : '-'}열`, "info");
+                        if (qtyColIdx === -1) addLog("수량 컬럼을 못 찾아 기본 1개로 반영합니다.", "warning");
                         break;
                     }
                 }
@@ -1484,8 +1530,8 @@
                     const fullTitle = opt ? `${title} ${opt}` : title;
 
                     let qty = 1;
-                    if (qtyColIdx !== -1 && row[qtyColIdx] !== "") {
-                        qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, "")) || 1;
+                    if (qtyColIdx !== -1) {
+                        qty = parseExcelQty(row[qtyColIdx]);
                     }
 
                     let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle));
@@ -1568,7 +1614,19 @@
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const currentStock = calcCurrentStock(item.name, end);
+            const cumulativeInToEndDate = db_in_history
+                .filter(h => h.name === item.name && h.date <= end)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const cumulativeSoldToEndDate = db_history
+                .filter(h => h.name === item.name && h.date <= end)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const cumulativeSampleNetToEndDate = db_sample_history
+                .filter(h => h.name === item.name && h.date <= end)
+                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+
+            const currentStock = (item.initial || 0) + cumulativeInToEndDate - cumulativeSoldToEndDate - cumulativeSampleNetToEndDate;
             const salesAmount = saleQtyInRange * (item.price || 0);
             rangeTotalSales += salesAmount;
 
