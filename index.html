@@ -1159,11 +1159,6 @@
 
             if (data.lastDate && data.lastDate < today) {
                 db_master.forEach(i => {
-                    const pendingSamples = db_sample_history
-                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
-                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-
-                    i.initial = i.initial - i.sold - pendingSamples;
                     i.sold = 0;
                 });
                 needsSave = true;
@@ -1241,19 +1236,7 @@
         db_master.forEach(item => {
             if ((item.name || '').includes('반품')) return;
 
-            const cumulativeInToViewDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSoldToViewDate = db_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSampleNetToViewDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const currentStock = (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
+            const currentStock = calcCurrentStock(item.name, viewDate);
             const recentSales = weeklySales[item.name] || 0;
 
             if (currentStock <= 0) {
@@ -1288,23 +1271,35 @@
         db_adjust_history.push({ date: getToday(), name, before: beforeQty, after: afterQty, memo: memo || "" });
     }
 
-    function getCurrentStockByDate(itemName, viewDate) {
+    function calcCurrentStock(itemName, viewDate) {
         const item = db_master.find(i => i.name === itemName);
         if (!item) return 0;
 
         const cumulativeInToViewDate = db_in_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
         const cumulativeSoldToViewDate = db_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
         const cumulativeSampleNetToViewDate = db_sample_history
             .filter(h => h.name === itemName && h.date <= viewDate)
-            .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
+            .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
-        return (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
+        const cumulativeAdjustDeltaToViewDate = db_adjust_history
+            .filter(h => h.name === itemName && h.date <= viewDate)
+            .reduce((sum, h) => sum + (Number(h.after || 0) - Number(h.before || 0)), 0);
+
+        return Number(item.initial || 0)
+            + cumulativeInToViewDate
+            - cumulativeSoldToViewDate
+            - cumulativeSampleNetToViewDate
+            + cumulativeAdjustDeltaToViewDate;
+    }
+
+    function getCurrentStockByDate(itemName, viewDate) {
+        return calcCurrentStock(itemName, viewDate);
     }
 
     function renderBulkEditList() {
@@ -1573,19 +1568,7 @@
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const cumulativeInToEndDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSoldToEndDate = db_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSampleNetToEndDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const currentStock = (item.initial || 0) + cumulativeInToEndDate - cumulativeSoldToEndDate - cumulativeSampleNetToEndDate;
+            const currentStock = calcCurrentStock(item.name, end);
             const salesAmount = saleQtyInRange * (item.price || 0);
             rangeTotalSales += salesAmount;
 
