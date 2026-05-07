@@ -1148,28 +1148,6 @@
             });
 
             const today = getToday();
-            const currentMonth = getCurrentMonth();
-            let needsSave = false;
-
-            if (data.lastMonth && data.lastMonth < currentMonth) {
-                db_master.forEach(i => i.inQty = 0);
-                addLog(`새로운 달(${currentMonth})이 시작되어 입고량 표시값이 초기화되었습니다.`, "info");
-                needsSave = true;
-            }
-
-            if (data.lastDate && data.lastDate < today) {
-                db_master.forEach(i => {
-                    const pendingSamples = db_sample_history
-                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
-                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-
-                    i.initial = i.initial - i.sold - pendingSamples;
-                    i.sold = 0;
-                });
-                needsSave = true;
-            }
-
-            if (needsSave) await saveToCloud();
 
             const monthStart = getMonthStart(today);
             selectedStartDate = selectedStartDate || monthStart;
@@ -1289,49 +1267,27 @@
     }
 
 function getCurrentStockByDate(itemName, viewDate) {
-  const item = db_master.find(i => i.name === itemName);
-  if (!item) return 0;
-
-  // 1) 이 품목의 마지막 재고조정 찾기 (viewDate 이전까지)
   const adjusts = db_adjust_history
     .filter(h => h.name === itemName && h.date <= viewDate)
     .sort((a, b) => (a.date > b.date ? 1 : -1));
 
   const lastAdjust = adjusts.length > 0 ? adjusts[adjusts.length - 1] : null;
-  const baseDate = lastAdjust ? lastAdjust.date : null;
+  const baseDate  = lastAdjust ? lastAdjust.date : null;
+  const baseStock = lastAdjust ? Number(lastAdjust.after || 0) : 0;
 
-  // 재고조정이 있으면 그 after를 기준으로, 없으면 초기재고(initial)를 기준으로
-  const baseStock = lastAdjust
-    ? Number(lastAdjust.after || 0)
-    : (item.initial || 0);
-
-  // 2) 마지막 재고조정 이후만 계산: (baseDate, viewDate]
-  const inQtyAfterAdjust = db_in_history
-    .filter(h =>
-      h.name === itemName &&
-      (!baseDate || h.date > baseDate) &&
-      h.date <= viewDate
-    )
+  const inQty = db_in_history
+    .filter(h => h.name === itemName && (!baseDate || h.date > baseDate) && h.date <= viewDate)
     .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
-  const soldQtyAfterAdjust = db_history
-    .filter(h =>
-      h.name === itemName &&
-      (!baseDate || h.date > baseDate) &&
-      h.date <= viewDate
-    )
+  const soldQty = db_history
+    .filter(h => h.name === itemName && (!baseDate || h.date > baseDate) && h.date <= viewDate)
     .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
-  const sampleNetAfterAdjust = db_sample_history
-    .filter(h =>
-      h.name === itemName &&
-      (!baseDate || h.date > baseDate) &&
-      h.date <= viewDate
-    )
+  const sampleQty = db_sample_history
+    .filter(h => h.name === itemName && (!baseDate || h.date > baseDate) && h.date <= viewDate)
     .reduce((sum, h) => sum + Number(h.qty || 0), 0);
 
-  // 현재고 = (마지막 조정값 또는 초기재고) + (조정 이후 입고) - (조정 이후 판매) - (조정 이후 샘플)
-  return baseStock + inQtyAfterAdjust - soldQtyAfterAdjust - sampleNetAfterAdjust;
+  return baseStock + inQty - soldQty - sampleQty;
 }
 
     function renderBulkEditList() {
@@ -1598,18 +1554,6 @@ function getCurrentStockByDate(itemName, viewDate) {
 
             const saleQtyInRange = db_history
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeInToEndDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSoldToEndDate = db_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSampleNetToEndDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
             const currentStock = getCurrentStockByDate(item.name, end);
