@@ -1269,31 +1269,39 @@
     }
 
 function getCurrentStockByDate(itemName, viewDate) {
-  // viewDate 이전(포함)의 마지막 재고조정을 기준점으로
+  // 품목의 유일한 재고조정 기록 (v5: 조정 시 기존 삭제 후 1개만 유지)
   const adjusts = db_adjust_history
-    .filter(h => h.name === itemName && h.date <= viewDate)
+    .filter(h => h.name === itemName)
     .sort((a, b) => (a.date > b.date ? 1 : -1));
 
   const lastAdjust = adjusts.length > 0 ? adjusts[adjusts.length - 1] : null;
-  const baseDate  = lastAdjust ? lastAdjust.date : null;
-  const baseStock = lastAdjust ? Number(lastAdjust.after || 0) : 0;
 
-  // 조정 당일(>=) 포함: 조정 후 1분 뒤 판매도 당일이면 반영
-  // 조정 없으면 전체 기간 합산
-  const inQty = db_in_history
-    .filter(h => h.name === itemName && (!baseDate || h.date >= baseDate) && h.date <= viewDate)
-    .reduce((sum, h) => sum + Number(h.qty || 0), 0);
+  if (!lastAdjust) {
+    // 조정 기록 없으면 전체 입고 - 전체 판매 - 전체 샘플
+    const inQty     = db_in_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const soldQty   = db_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    return inQty - soldQty - sampleQty;
+  }
 
-  const soldQty = db_history
-    .filter(h => h.name === itemName && (!baseDate || h.date >= baseDate) && h.date <= viewDate)
-    .reduce((sum, h) => sum + Number(h.qty || 0), 0);
+  const baseDate  = lastAdjust.date;
+  const baseStock = Number(lastAdjust.after || 0);
 
-  const sampleQty = db_sample_history
-    .filter(h => h.name === itemName && (!baseDate || h.date >= baseDate) && h.date <= viewDate)
-    .reduce((sum, h) => sum + Number(h.qty || 0), 0);
-
-  // 현재고 = 조정값 + 조정일 이후 입고 - 조정일 이후 판매 - 조정일 이후 샘플
-  return baseStock + inQty - soldQty - sampleQty;
+  if (viewDate >= baseDate) {
+    // 조정일 이후(당일 포함) ~ viewDate 까지 정방향 계산
+    const inQty     = db_in_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const soldQty   = db_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    return baseStock + inQty - soldQty - sampleQty;
+  } else {
+    // viewDate < baseDate: 조정일 기준으로 역산
+    // 조정 after는 baseDate 기준 재고 → viewDate까지 되돌리려면 baseDate~viewDate 사이 판매/샘플은 더하고, 입고는 빼야 함
+    const inQty     = db_in_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const soldQty   = db_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+    // viewDate 재고 = 조정값 - (그 사이 입고) + (그 사이 판매+샘플)
+    return baseStock - inQty + soldQty + sampleQty;
+  }
 }
 
     function renderBulkEditList() {
