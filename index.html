@@ -675,7 +675,7 @@
     <div class="topbar">
         <div class="topbar-left">
             <div class="topbar-title">SKY Commerce 관리시스템</div>
-            <div class="topbar-sub">입력은 항상 당일 저장 / 조회는 선택 기간 기준</div>
+            <div class="topbar-sub">모든 재고는 원장 이력 기준 실시간 계산 / 입력은 항상 당일 저장</div>
         </div>
         <div class="topbar-nav">
             <button class="nav-btn active" data-page-btn="page1" onclick="switchPage('page1')">1페이지 · 조회</button>
@@ -775,7 +775,7 @@
         <div class="page-title-wrap">
             <div>
                 <div class="page-title">등록 / 매칭 / 반영</div>
-                <div class="page-desc">판매, 샘플, 입고, 재고조정은 모두 오늘 날짜로 저장됩니다.</div>
+                <div class="page-desc">판매·샘플·입고·재고조정은 모두 원장 이력으로 저장되며 현재고는 이력 기준으로 계산됩니다.</div>
             </div>
         </div>
 
@@ -786,7 +786,7 @@
                     <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:10px;">
                         <input type="text" id="mName" placeholder="품목명">
                         <input type="number" id="mPrice" placeholder="단가" value="0">
-                        <input type="number" id="mQty" placeholder="기초재고" value="0">
+                        <input type="number" id="mQty" placeholder="초기 수량(조정으로 저장됨)" value="0">
                     </div>
                     <button class="btn btn-main" onclick="addItem()">품목 리스트 추가</button>
                 </div>
@@ -1142,6 +1142,7 @@
                 memo: h.memo || ''
             }));
 
+
             const today = getToday();
             const currentMonth = getCurrentMonth();
             let needsSave = false;
@@ -1153,16 +1154,9 @@
             }
 
             if (data.lastDate && data.lastDate < today) {
-                db_master.forEach(i => {
-                    const pendingSamples = db_sample_history
-                        .filter(sh => sh.name === i.name && sh.date >= data.lastDate && sh.date < today)
-                        .reduce((sum, sh) => sum + parseInt(sh.qty || 0), 0);
-
-                    i.initial = i.initial - i.sold - pendingSamples;
-                    i.sold = 0;
-                });
-                needsSave = true;
+                // 날짜가 바뀌어도 원장 이력은 수정하지 않음. 현재고는 항상 원장 기준으로 계산.
             }
+
 
             if (needsSave) await saveToCloud();
 
@@ -1236,19 +1230,7 @@
         db_master.forEach(item => {
             if ((item.name || '').includes('반품')) return;
 
-            const cumulativeInToViewDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSoldToViewDate = db_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSampleNetToViewDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= viewDate)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const currentStock = (item.initial || 0) + cumulativeInToViewDate - cumulativeSoldToViewDate - cumulativeSampleNetToViewDate;
+            const currentStock = getCurrentStockByDate(item.name, viewDate);
             const recentSales = weeklySales[item.name] || 0;
 
             if (currentStock <= 0) {
@@ -1284,9 +1266,6 @@
     }
 
     function getCurrentStockByDate(itemName, viewDate) {
-        const item = db_master.find(i => i.name === itemName);
-        if (!item) return 0;
-
         const inQty = db_in_history
             .filter(h => h.name === itemName && h.date <= viewDate)
             .reduce((sum, h) => sum + Number(h.qty || 0), 0);
@@ -1573,19 +1552,7 @@
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
-            const cumulativeInToEndDate = db_in_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSoldToEndDate = db_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const cumulativeSampleNetToEndDate = db_sample_history
-                .filter(h => h.name === item.name && h.date <= end)
-                .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-            const currentStock = (item.initial || 0) + cumulativeInToEndDate - cumulativeSoldToEndDate - cumulativeSampleNetToEndDate;
+            const currentStock = getCurrentStockByDate(item.name, end);
             const salesAmount = saleQtyInRange * (item.price || 0);
             rangeTotalSales += salesAmount;
 
@@ -1884,20 +1851,8 @@
                 const idx = db_master.findIndex(i => i.name === change.name);
                 if (idx === -1) return;
 
-                const cumulativeInToViewDate = db_in_history
-                    .filter(h => h.name === change.name && h.date <= viewDate)
-                    .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-                const cumulativeSoldToViewDate = db_history
-                    .filter(h => h.name === change.name && h.date <= viewDate)
-                    .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-                const cumulativeSampleNetToViewDate = db_sample_history
-                    .filter(h => h.name === change.name && h.date <= viewDate)
-                    .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
-
-                db_master[idx].initial = change.afterQty - cumulativeInToViewDate + cumulativeSoldToViewDate + cumulativeSampleNetToViewDate;
-                addAdjustHistoryToday(change.name, change.beforeQty, change.afterQty, memo);
+                const beforeQty = getCurrentStockByDate(change.name, viewDate);
+                addAdjustHistoryToday(change.name, beforeQty, change.afterQty, memo);
             });
 
             await saveToCloud();
@@ -1932,14 +1887,18 @@
         if (!name) return;
 
         saveStateForUndo();
+        const openingQty = parseInt(document.getElementById('mQty').value || 0, 10);
         db_master.push({
             name,
             price: parseInt(document.getElementById('mPrice').value || 0, 10),
-            initial: parseInt(document.getElementById('mQty').value || 0, 10),
+            initial: 0,
             sold: 0,
             inQty: 0,
             sampleQty: 0
         });
+        if (openingQty !== 0) {
+            db_adjust_history.push({ date: getToday(), name, before: 0, after: openingQty, memo: '초기 재고 등록' });
+        }
 
         await saveToCloud();
         addLog(`${name} 신규 품목 추가`, "info");
