@@ -941,7 +941,7 @@
     let isSaving = false;
     let needsRefresh = false;
     let lastKnownTs = "";
-    const POLL_INTERVAL = 30000; // 30초
+    const POLL_INTERVAL = 10000; // 10초
 
     function toggleLoading(show) {
         document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none';
@@ -1067,7 +1067,16 @@
     // ── 자동 폴링: 30초마다 서버 데이터 확인 후 변경사항 있으면 자동 렌더링
     function startPolling() {
         if (pollingTimer) clearInterval(pollingTimer);
-        pollingTimer = setInterval(pollFromCloud, POLL_INTERVAL);
+        // 08:30~17:00 업무시간에만 10초 폴링, 그 외 자동 폴링 중단
+        pollingTimer = setInterval(function() {
+            const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+            const hhmm = now.getHours() * 60 + now.getMinutes();
+            const workStart = 8 * 60 + 30;  // 08:30
+            const workEnd   = 18 * 60;       // 18:00
+            if (hhmm >= workStart && hhmm < workEnd) {
+                pollFromCloud();
+            }
+        }, POLL_INTERVAL);
     }
 
     async function pollFromCloud() {
