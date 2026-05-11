@@ -807,6 +807,7 @@
                         <button id="undoBtn" class="btn" style="background:var(--danger); color:white; font-size:12px; height:32px; padding:0 15px;" onclick="undoLastAction()" disabled>↩️ 방금 전 되돌리기</button>
                     </div>
 
+                    <div id="needsRefreshNotice" style="display:none; background:#fff3cd; color:#856404; border:1px solid #ffeaa7; padding:10px 12px; border-radius:8px; margin-bottom:10px; font-size:13px; font-weight:bold;">⚠️ 새로고침 필요: 다른 기기에서 데이터가 변경되었습니다. 품목 반영 전 내용을 확인하세요.</div>
                     <div style="font-weight:bold; color:var(--point); margin-bottom:8px; font-size:13px;">🛒 판매 반영 (당일 저장 / 매출포함 / 재고차감)</div>
                     <div id="multiSaleRows"></div>
 
@@ -936,6 +937,11 @@
     let selectedStartDate = "";
     let selectedEndDate = "";
     let currentMode = "";
+    let pollingTimer = null;
+    let isSaving = false;
+    let needsRefresh = false;
+    let lastKnownTs = "";
+    const POLL_INTERVAL = 30000; // 30초
 
     function toggleLoading(show) {
         document.getElementById('loadingOverlay').style.display = show ? 'block' : 'none';
@@ -1033,6 +1039,87 @@
         };
         const undoBtn = document.getElementById('undoBtn');
         if (undoBtn) undoBtn.disabled = false;
+    }
+
+    // ── 새로고침 필요 배너 표시/숨김
+    function showRefreshBanner() {
+        let banner = document.getElementById('refreshBanner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'refreshBanner';
+            banner.style.cssText = 'position:fixed; top:0; left:0; width:100%; background:#e67e22; color:white; text-align:center; padding:10px 16px; font-weight:bold; font-size:14px; z-index:8000; display:flex; justify-content:space-between; align-items:center; box-shadow:0 2px 8px rgba(0,0,0,0.2);';
+            banner.innerHTML = '<span>🔄 다른 기기에서 데이터가 변경되었습니다. 품목 반영 전 확인하세요.</span><button onclick="hideRefreshBanner()" style="background:white; color:#e67e22; border:none; border-radius:6px; padding:4px 12px; font-weight:bold; cursor:pointer;">확인</button>';
+            document.body.prepend(banner);
+        }
+        banner.style.display = 'flex';
+        const notice = document.getElementById('needsRefreshNotice');
+        if (notice) notice.style.display = 'block';
+    }
+
+    function hideRefreshBanner() {
+        const banner = document.getElementById('refreshBanner');
+        if (banner) banner.style.display = 'none';
+        const notice = document.getElementById('needsRefreshNotice');
+        if (notice) notice.style.display = 'none';
+        needsRefresh = false;
+    }
+
+    // ── 자동 폴링: 30초마다 서버 데이터 확인 후 변경사항 있으면 자동 렌더링
+    function startPolling() {
+        if (pollingTimer) clearInterval(pollingTimer);
+        pollingTimer = setInterval(pollFromCloud, POLL_INTERVAL);
+    }
+
+    async function pollFromCloud() {
+        if (isSaving) return;
+        try {
+            // lastDate만 가져와서 비교 (데이터 전체 비교 방지)
+            const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime() + "&pin=" + authPin;
+            const resp = await fetch(fetchUrl);
+            const data = await resp.json();
+            if (data.error) return;
+
+            // 서버 저장 시각이 내가 마지막으로 저장/로드한 시각보다 최신이면 변경된 것
+            const serverTs = data.lastSaveTs || "";
+            if (serverTs && serverTs !== lastKnownTs) {
+                lastKnownTs = serverTs;
+                // 데이터 반영
+                db_master = data.master || [];
+                db_map = (data.map || []).map(m => {
+                    let t = m.targets || [];
+                    if (typeof t === 'string') { try { t = JSON.parse(t); } catch(e) { t = t.split(','); } }
+                    if (!Array.isArray(t)) t = [t];
+                    t = t.map(x => String(x).replace(/[\[\]"]/g, '').trim()).filter(x => x && x !== 'undefined' && x !== 'null');
+                    return { exName: String(m.exName || '').trim(), targets: t };
+                }).filter(m => m.exName);
+                db_history = (data.history || []).map(h => {
+                    let d = h.date || getToday();
+                    if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                    return { ...h, date: d, name: h.name || '알수없음' };
+                });
+                db_in_history = (data.inHistory || []).map(h => {
+                    let d = h.date || getToday();
+                    if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                    return { ...h, date: d };
+                });
+                db_sample_history = (data.sampleHistory || []).map(h => {
+                    let d = h.date || getToday();
+                    if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                    return { ...h, date: d, name: h.name || '알수없음' };
+                });
+                db_adjust_history = (data.adjustHistory || []).map(h => {
+                    let d = h.date || getToday();
+                    if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                    return { ...h, date: d, name: h.name || '알수없음', before: parseInt(h.before || 0), after: parseInt(h.after || 0), memo: h.memo || '' };
+                });
+                needsRefresh = true;
+                render();
+                showRefreshBanner();
+                addLog("🔄 다른 기기에서 변경된 데이터가 자동 반영되었습니다.", "info");
+            }
+        } catch (e) {
+            // 폴링 실패는 조용히 무시
+        }
     }
 
     function checkLogin() {
@@ -1147,6 +1234,9 @@
                 };
             });
 
+            // 서버 저장 시각 기록 (폴링 비교용)
+            lastKnownTs = data.lastSaveTs || "";
+
             const today = getToday();
 
             const monthStart = getMonthStart(today);
@@ -1166,6 +1256,10 @@
                 checkLowStock(false);
                 hasCheckedLowStock = true;
             }
+
+            // 자동 폴링 시작 (최초 로드 시 1회만)
+            if (!pollingTimer) startPolling();
+
         } catch (e) {
             document.getElementById('mainContainer').style.display = 'none';
             document.getElementById('loginOverlay').style.display = 'flex';
@@ -1176,6 +1270,7 @@
     }
 
     async function saveToCloud() {
+        isSaving = true;
         toggleLoading(true);
         try {
             const resp = await fetch(G_SCRIPT_URL, {
@@ -1195,11 +1290,56 @@
             });
             const result = await resp.json();
             if (result.error) throw new Error(result.error);
-            render();
+            // 저장 직후 서버에서 최신 데이터 다시 읽어오기 (다른 기기 자동 반영)
+            await reloadFromCloud();
         } catch (e) {
             addLog("구글 시트 저장 실패: " + e.message, "danger");
         }
         toggleLoading(false);
+        isSaving = false;
+    }
+
+    // 서버에서 최신 데이터만 조용히 다시 읽어서 render (로딩 오버레이 없음)
+    async function reloadFromCloud() {
+        try {
+            const fetchUrl = G_SCRIPT_URL + "?ts=" + new Date().getTime() + "&pin=" + authPin;
+            const resp = await fetch(fetchUrl);
+            const data = await resp.json();
+            if (data.error) { render(); return; }
+
+            db_master = data.master || [];
+            db_map = (data.map || []).map(m => {
+                let t = m.targets || [];
+                if (typeof t === 'string') { try { t = JSON.parse(t); } catch(e) { t = t.split(','); } }
+                if (!Array.isArray(t)) t = [t];
+                t = t.map(x => String(x).replace(/[\[\]"]/g, '').trim()).filter(x => x && x !== 'undefined' && x !== 'null');
+                return { exName: String(m.exName || '').trim(), targets: t };
+            }).filter(m => m.exName);
+            db_history = (data.history || []).map(h => {
+                let d = h.date || getToday();
+                if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                return { ...h, date: d, name: h.name || '알수없음' };
+            });
+            db_in_history = (data.inHistory || []).map(h => {
+                let d = h.date || getToday();
+                if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                return { ...h, date: d };
+            });
+            db_sample_history = (data.sampleHistory || []).map(h => {
+                let d = h.date || getToday();
+                if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                return { ...h, date: d, name: h.name || '알수없음' };
+            });
+            db_adjust_history = (data.adjustHistory || []).map(h => {
+                let d = h.date || getToday();
+                if (String(d).includes('T')) d = normalizeDateFromISO(d);
+                return { ...h, date: d, name: h.name || '알수없음', before: parseInt(h.before || 0), after: parseInt(h.after || 0), memo: h.memo || '' };
+            });
+            lastKnownTs = data.lastSaveTs || lastKnownTs;
+            render();
+        } catch (e) {
+            render(); // 실패해도 현재 데이터로 렌더
+        }
     }
 
     function checkLowStock(isManual = false) {
@@ -1389,6 +1529,10 @@ function getCurrentStockByDate(itemName, viewDate) {
         else if (fileName.includes('allOrderList')) source = "11번가";
         else if (fileName.includes('스카이커머스') && fileName.includes('주문 내역')) source = "올웨이즈";
 
+        if (needsRefresh) {
+            if (!confirm("⚠️ 다른 기기에서 데이터가 변경되었습니다.\n현재 데이터는 이미 자동 반영되었습니다. 계속 진행하시겠습니까?")) return;
+            hideRefreshBanner();
+        }
         addLog(`${fileName} 분석 시작 → 플랫폼: ${source}`, "info");
         addLog(`입력 반영일은 ${getToday()} 기준으로 저장됩니다.`, "info");
 
