@@ -1333,7 +1333,7 @@ function getCurrentStockByDate(itemName, viewDate) {
     }
 
     function getSourceOptionsHtml(selectedSource = '') {
-        const sources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "기타"];
+        const sources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "올웨이즈", "기타"];
         return sources.map(src => `<option value="${src}" ${src === selectedSource ? 'selected' : ''}>${src}</option>`).join('');
     }
 
@@ -1387,6 +1387,7 @@ function getCurrentStockByDate(itemName, viewDate) {
         else if (fileName.toLowerCase().includes('compuzone')) source = "컴퓨존";
         else if (fileName.toUpperCase().includes('SSG') || fileName.includes('쓱')) source = "SSG";
         else if (fileName.includes('allOrderList')) source = "11번가";
+        else if (fileName.includes('스카이커머스') && fileName.includes('주문 내역')) source = "올웨이즈";
 
         addLog(`${fileName} 분석 시작 → 플랫폼: ${source}`, "info");
         addLog(`입력 반영일은 ${getToday()} 기준으로 저장됩니다.`, "info");
