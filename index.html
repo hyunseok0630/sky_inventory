@@ -1613,7 +1613,7 @@ function getCurrentStockByDate(itemName, viewDate) {
                         const cellVal = String(row[j]).replace(/\s+/g, '');
                         if (tIdx === -1 && cellVal.match(/상품명|주문상품명|품목명|상품정보|제품명|컴퓨존제품명/) && !cellVal.match(/ID/) && !cellVal.match(/협력사|코드/)) tIdx = j;
                         if (oIdx === -1 && cellVal.match(/옵션|옵션명|선택옵션|옵션내용/) && !cellVal.match(/ID/)) oIdx = j;
-                        if (qIdx === -1 && cellVal.match(/^수량$|^수량[^금]|주문수량|구매수량|결제수량/) && !cellVal.match(/금액/)) qIdx = j;
+                        if (qIdx === -1 && cellVal.match(/^수량$|^수량[^금]|주문수량|구매수량|구매수\(수량\)|결제수량|상품수량|주문상품수량|배송수량|출고수량|구매개수|수량\(개\)|수량개/) && !cellVal.match(/금액|재고/)) qIdx = j;
                     }
 
                     if (tIdx !== -1) {
@@ -1652,10 +1652,31 @@ function getCurrentStockByDate(itemName, viewDate) {
                     const opt = optColIdx !== -1 && row[optColIdx] ? String(row[optColIdx]).trim() : "";
                     const fullTitle = opt ? `${title} ${opt}` : title;
 
+                    // 플랫폼별 수량 보정
                     let qty = 1;
                     if (qtyColIdx !== -1 && row[qtyColIdx] !== "") {
                         qty = parseInt(String(row[qtyColIdx]).replace(/[^0-9]/g, "").trim()) || 1;
                     }
+
+                    // 네이버 스마트스토어: AA열(27번째, index 26)에 실제 수량이 있음
+                    if (source === "네이버") {
+                        const aaIdx = 26; // AA열 index
+                        if (row.length > aaIdx && row[aaIdx] !== "") {
+                            const parsed = parseInt(String(row[aaIdx]).replace(/[^0-9]/g, "").trim());
+                            if (!isNaN(parsed) && parsed > 0) qty = parsed;
+                        }
+                    }
+
+                    // 쿠팡: W열(23번째, index 22)에 "구매수(수량)" 컬럼 고정
+                    if (source === "쿠팡") {
+                        const wIdx = 22; // W열 index
+                        if (row.length > wIdx && row[wIdx] !== "") {
+                            const parsed = parseInt(String(row[wIdx]).replace(/[^0-9]/g, "").trim());
+                            if (!isNaN(parsed) && parsed > 0) qty = parsed;
+                        }
+                    }
+
+                    addLog(`행${i+1} 수량=${qty}${qtyColIdx !== -1 ? ` (수량열:${qtyColIdx+1})` : ' (수량열 미감지)'}`, "info");
 
                     let rule = db_map.find(m => cleanStr(m.exName) === cleanStr(fullTitle));
                     if (!rule && opt) rule = db_map.find(m => cleanStr(m.exName) === cleanStr(opt));
