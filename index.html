@@ -1417,41 +1417,41 @@
         db_adjust_history.push({ date: getToday(), name, before: beforeQty, after: afterQty, memo: memo || "" });
     }
 
-function getCurrentStockByDate(itemName, viewDate) {
-  // 품목의 유일한 재고조정 기록 (v5: 조정 시 기존 삭제 후 1개만 유지)
-  const adjusts = db_adjust_history
-    .filter(h => h.name === itemName)
-    .sort((a, b) => (a.date > b.date ? 1 : -1));
+    function getCurrentStockByDate(itemName, viewDate) {
+        // 품목의 유일한 재고조정 기록 (v5: 조정 시 기존 삭제 후 1개만 유지)
+        const adjusts = db_adjust_history
+            .filter(h => h.name === itemName)
+            .sort((a, b) => (a.date > b.date ? 1 : -1));
 
-  const lastAdjust = adjusts.length > 0 ? adjusts[adjusts.length - 1] : null;
+        const lastAdjust = adjusts.length > 0 ? adjusts[adjusts.length - 1] : null;
 
-  if (!lastAdjust) {
-    // 조정 기록 없으면 전체 입고 - 전체 판매 - 전체 샘플
-    const inQty     = db_in_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const soldQty   = db_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    return inQty - soldQty - sampleQty;
-  }
+        if (!lastAdjust) {
+            // 조정 기록 없으면 전체 입고 - 전체 판매 - 전체 샘플
+            const inQty     = db_in_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const soldQty   = db_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            return inQty - soldQty - sampleQty;
+        }
 
-  const baseDate  = lastAdjust.date;
-  const baseStock = Number(lastAdjust.after || 0);
+        const baseDate  = lastAdjust.date;
+        const baseStock = Number(lastAdjust.after || 0);
 
-  if (viewDate >= baseDate) {
-    // 조정일 이후(당일 포함) ~ viewDate 까지 정방향 계산
-    const inQty     = db_in_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const soldQty   = db_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    return baseStock + inQty - soldQty - sampleQty;
-  } else {
-    // viewDate < baseDate: 조정일 기준으로 역산
-    // 조정 after는 baseDate 기준 재고 → viewDate까지 되돌리려면 baseDate~viewDate 사이 판매/샘플은 더하고, 입고는 빼야 함
-    const inQty     = db_in_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const soldQty   = db_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
-    // viewDate 재고 = 조정값 - (그 사이 입고) + (그 사이 판매+샘플)
-    return baseStock - inQty + soldQty + sampleQty;
-  }
-}
+        if (viewDate >= baseDate) {
+            // 조정일 이후(당일 포함) ~ viewDate 까지 정방향 계산
+            const inQty     = db_in_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const soldQty   = db_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date >= baseDate && h.date <= viewDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            return baseStock + inQty - soldQty - sampleQty;
+        } else {
+            // viewDate < baseDate: 조정일 기준으로 역산
+            // 조정 after는 baseDate 기준 재고 → viewDate까지 되돌리려면 baseDate~viewDate 사이 판매/샘플은 더하고, 입고는 빼야 함
+            const inQty     = db_in_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const soldQty   = db_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            const sampleQty = db_sample_history.filter(h => h.name === itemName && h.date > viewDate && h.date <= baseDate).reduce((s,h) => s + Number(h.qty||0), 0);
+            // viewDate 재고 = 조정값 - (그 사이 입고) + (그 사이 판매+샘플)
+            return baseStock - inQty + soldQty + sampleQty;
+        }
+    }
 
     function renderBulkEditList() {
         const wrap = document.getElementById('bulkEditList');
@@ -2104,15 +2104,23 @@ function getCurrentStockByDate(itemName, viewDate) {
         const name = document.getElementById('mName').value.trim();
         if (!name) return;
 
+        // 입력한 기초재고 값을 변수에 저장
+        const initialQty = parseInt(document.getElementById('mQty').value || 0, 10);
+
         saveStateForUndo();
         db_master.push({
             name,
             price: parseInt(document.getElementById('mPrice').value || 0, 10),
-            initial: parseInt(document.getElementById('mQty').value || 0, 10),
+            initial: initialQty,
             sold: 0,
             inQty: 0,
             sampleQty: 0
         });
+
+        // [해결 2] 기초재고가 0보다 크면 '재고 조정 내역'으로 자동 기록하여 현재고에 반영시킴
+        if (initialQty > 0) {
+            addAdjustHistoryToday(name, 0, initialQty, "신규 품목 기초재고 등록");
+        }
 
         await saveToCloud();
         addLog(`${name} 신규 품목 추가`, "info");
@@ -2120,6 +2128,9 @@ function getCurrentStockByDate(itemName, viewDate) {
         document.getElementById('mName').value = "";
         document.getElementById('mPrice').value = 0;
         document.getElementById('mQty').value = 0;
+
+        // [해결 1] 추가 완료 후 드롭다운과 재고표를 포함한 화면 전체를 새로고침
+        render(); 
     }
 
     async function applyMultiDirectSale() {
