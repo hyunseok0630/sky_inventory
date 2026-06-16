@@ -1928,18 +1928,31 @@
         const sortedItemsForDropdown = [...db_master].sort((a, b) => a.name.localeCompare(b.name, 'ko'));
         const optionsHtml = sortedItemsForDropdown.map(i => `<option value="${i.name}">${i.name}</option>`).join('');
 
+        // 1. 샘플, AS, 입고 등 고정된 드롭다운 업데이트
         const ids = ['sampleItemSelect', 'asItemSelect', 'sampleInItemSelect', 'actionItemSelect'];
         ids.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.innerHTML = optionsHtml;
+            if (el) {
+                const currentVal = el.value; // 기존에 선택했던 값 기억
+                el.innerHTML = optionsHtml;
+                if (currentVal) el.value = currentVal; // 기존 선택값 복원 (선택 풀림 방지)
+            }
         });
 
+        // 2. 플랫폼 상품 매칭 설정 체크박스 업데이트
         const itemChecks = document.getElementById('itemChecks');
         if (itemChecks) {
             itemChecks.innerHTML = sortedItemsForDropdown
                 .map(i => `<label class="chk-item"><input type="checkbox" class="chk" value="${i.name}"><span>${i.name}</span></label>`)
                 .join('');
         }
+
+        // 3. [해결된 부분] '판매 반영' 영역의 개별 행 드롭다운도 모두 업데이트
+        document.querySelectorAll('.multi-sale-item').forEach(select => {
+            const currentVal = select.value; // 기존에 선택했던 값 기억
+            select.innerHTML = optionsHtml;
+            if (currentVal) select.value = currentVal; // 기존 선택값 복원
+        });
 
         const multiSaleRows = document.getElementById('multiSaleRows');
         if (multiSaleRows && multiSaleRows.children.length === 0) {
@@ -2117,7 +2130,7 @@
             sampleQty: 0
         });
 
-        // [해결 2] 기초재고가 0보다 크면 '재고 조정 내역'으로 자동 기록하여 현재고에 반영시킴
+        // 기초재고가 0보다 크면 '재고 조정 내역'으로 자동 기록하여 현재고에 반영시킴
         if (initialQty > 0) {
             addAdjustHistoryToday(name, 0, initialQty, "신규 품목 기초재고 등록");
         }
@@ -2129,7 +2142,7 @@
         document.getElementById('mPrice').value = 0;
         document.getElementById('mQty').value = 0;
 
-        // [해결 1] 추가 완료 후 드롭다운과 재고표를 포함한 화면 전체를 새로고침
+        // 추가 완료 후 드롭다운과 재고표를 포함한 화면 전체를 새로고침
         render(); 
     }
 
