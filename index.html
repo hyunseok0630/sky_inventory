@@ -439,6 +439,7 @@
         .tag-GS { background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }
         .tag-11번가 { background: #fff0f0; color: #c0392b; border-color: #ffcccc; }
         .tag-M몰 { background: #e0f7fa; color: #004187; border-color: #b2ebf2; }
+        .tag-이마트 { background: #fffde7; color: #f57f17; border-color: #fff59d; } /* 이마트 색상 추가 */
         .tag-기타 { background: #f1f3f5; color: #495057; border-color: #ced4da; }
 
         input, select {
@@ -1482,8 +1483,21 @@
     }
 
     function getSourceOptionsHtml(selectedSource = '') {
-        const sources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "올웨이즈", "기타"];
+        const sources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "올웨이즈", "이마트", "기타"];
         return sources.map(src => `<option value="${src}" ${src === selectedSource ? 'selected' : ''}>${src}</option>`).join('');
+    }
+
+    // [기능 추가] 기타 선택 시 직접 입력을 토글하는 함수
+    function toggleCustomSource(selectElem) {
+        const customInput = selectElem.nextElementSibling;
+        if (selectElem.value === '기타') {
+            customInput.style.display = 'block';
+            selectElem.style.flex = '1';
+        } else {
+            customInput.style.display = 'none';
+            selectElem.style.flex = '1.5';
+            customInput.value = ''; // 다른 옵션 선택시 입력값 초기화
+        }
     }
 
     function addSaleRow(defaults = {}) {
@@ -1492,14 +1506,16 @@
 
         const row = document.createElement('div');
         row.className = 'multi-sale-row';
+        // 기타 선택 시 수기 입력을 보여줄 인풋창 포함 및 토글 함수 연결
         row.innerHTML = `
             <select class="multi-sale-item" style="flex:2;">
                 ${getItemOptionsHtml(defaults.name || '')}
             </select>
             <input type="number" class="multi-sale-qty" value="${defaults.qty || 1}" min="1" style="flex:1;" placeholder="수량">
-            <select class="multi-sale-source" style="flex:1.5;">
+            <select class="multi-sale-source" style="flex:${defaults.source === '기타' ? '1' : '1.5'};" onchange="toggleCustomSource(this)">
                 ${getSourceOptionsHtml(defaults.source || '세미트론')}
             </select>
+            <input type="text" class="multi-sale-custom-source" placeholder="직접 입력" style="flex:1; display:${defaults.source === '기타' ? 'block' : 'none'};">
             <button class="btn" style="background:var(--danger); color:white; flex:0.7;" onclick="removeSaleRow(this)">삭제</button>
         `;
         wrap.appendChild(row);
@@ -1947,7 +1963,7 @@
                 .join('');
         }
 
-        // 3. [해결된 부분] '판매 반영' 영역의 개별 행 드롭다운도 모두 업데이트
+        // 3. '판매 반영' 영역의 개별 행 드롭다운도 모두 업데이트
         document.querySelectorAll('.multi-sale-item').forEach(select => {
             const currentVal = select.value; // 기존에 선택했던 값 기억
             select.innerHTML = optionsHtml;
@@ -2152,7 +2168,16 @@
         const entries = rows.map(row => {
             const name = row.querySelector('.multi-sale-item')?.value || '';
             const qty = parseInt(row.querySelector('.multi-sale-qty')?.value || 0, 10);
-            const source = row.querySelector('.multi-sale-source')?.value || '기타';
+            let source = row.querySelector('.multi-sale-source')?.value || '기타';
+
+            // [추가] 기타 선택 시 직접 입력한 값 가져오기
+            if (source === '기타') {
+                const customSource = row.querySelector('.multi-sale-custom-source')?.value.trim();
+                if (customSource) {
+                    source = customSource;
+                }
+            }
+
             return { name, qty, source };
         }).filter(entry => entry.name && entry.qty > 0);
 
