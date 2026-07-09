@@ -439,7 +439,7 @@
         .tag-GS { background: #f3e5f5; color: #4a148c; border-color: #e1bee7; }
         .tag-11번가 { background: #fff0f0; color: #c0392b; border-color: #ffcccc; }
         .tag-M몰 { background: #e0f7fa; color: #004187; border-color: #b2ebf2; }
-        .tag-이마트 { background: #fffde7; color: #f57f17; border-color: #fff59d; } /* 이마트 색상 추가 */
+        .tag-이마트 { background: #fffde7; color: #f57f17; border-color: #fff59d; }
         .tag-기타 { background: #f1f3f5; color: #495057; border-color: #ced4da; }
 
         input, select {
@@ -515,7 +515,7 @@
         .search-box {
             position: relative;
             flex: 1;
-            max-width: 300px;
+            max-width: 250px;
             display: flex;
             align-items: center;
         }
@@ -703,7 +703,7 @@
         <div class="page-title-wrap">
             <div>
                 <div class="page-title">재고 및 히스토리 조회</div>
-                <div class="page-desc">재고표는 단가 높은 순으로 정렬되며, 조정 이력도 함께 조회됩니다.</div>
+                <div class="page-desc">재고표는 단가 높은 순 정렬이며, 지정 기간의 합계 데이터가 표시됩니다.</div>
             </div>
         </div>
 
@@ -751,7 +751,12 @@
 
                     <div class="history-layout">
                         <div>
-                            <div style="font-weight:bold; color:var(--point); margin-bottom:5px;">🛒 판매 내역</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                <div style="font-weight:bold; color:var(--point);">🛒 판매 내역</div>
+                                <select id="sourceFilter" onchange="updateSalesHistoryView()" style="width:130px; height:26px; padding:2px 5px; font-size:12px; border:1px solid var(--border); border-radius:4px; color:var(--secondary); font-weight:bold; outline:none;">
+                                    <option value="">모든 판매처</option>
+                                </select>
+                            </div>
                             <div id="historyContainer" class="history-list"></div>
                         </div>
                         <div>
@@ -1487,7 +1492,7 @@
         return sources.map(src => `<option value="${src}" ${src === selectedSource ? 'selected' : ''}>${src}</option>`).join('');
     }
 
-    // [기능 추가] 기타 선택 시 직접 입력을 토글하는 함수
+    // 기타 선택 시 직접 입력을 토글하는 함수
     function toggleCustomSource(selectElem) {
         const customInput = selectElem.nextElementSibling;
         if (selectElem.value === '기타') {
@@ -1506,7 +1511,6 @@
 
         const row = document.createElement('div');
         row.className = 'multi-sale-row';
-        // 기타 선택 시 수기 입력을 보여줄 인풋창 포함 및 토글 함수 연결
         row.innerHTML = `
             <select class="multi-sale-item" style="flex:2;">
                 ${getItemOptionsHtml(defaults.name || '')}
@@ -1755,9 +1759,16 @@
         reader.readAsArrayBuffer(file);
     }
 
+    // 판매처 필터가 변경될 때 메인화면 렌더링 대신 판매내역 히스토리만 새로고침하는 함수
+    function updateSalesHistoryView() {
+        const { start, end } = getViewRange();
+        renderSalesHistory(start, end);
+    }
+
     function render() {
         const table = document.getElementById('mainTable');
         const search = document.getElementById('inventorySearch')?.value.toLowerCase() || "";
+        
         let rangeTotalSales = 0;
         const { start, end } = getViewRange();
 
@@ -1765,20 +1776,24 @@
             .filter(i => (i.name || '').toLowerCase().includes(search))
             .sort((a, b) => (b.price || 0) - (a.price || 0));
 
-        table.innerHTML = sortedMasterData.map(item => {
+        let tableHtml = "";
+
+        sortedMasterData.forEach(item => {
             const inQtyInRange = db_in_history
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
+            // 재고 메인 표는 판매처 필터에 상관없이 무조건 전체 누적 수량을 보여줍니다.
             const saleQtyInRange = db_history
                 .filter(h => h.name === item.name && h.date >= start && h.date <= end)
                 .reduce((sum, h) => sum + parseInt(h.qty || 0), 0);
 
             const currentStock = getCurrentStockByDate(item.name, end);
             const salesAmount = saleQtyInRange * (item.price || 0);
+            
             rangeTotalSales += salesAmount;
 
-            return `
+            tableHtml += `
                 <tr>
                     <td style="text-align:left"><b>${item.name || ''}</b></td>
                     <td>${(item.price || 0).toLocaleString()}</td>
@@ -1788,7 +1803,9 @@
                     <td style="font-weight:bold;">${salesAmount.toLocaleString()}</td>
                 </tr>
             `;
-        }).join('');
+        });
+
+        table.innerHTML = tableHtml || `<tr><td colspan="6" style="padding:20px; color:#888;">조회된 항목이 없습니다.</td></tr>`;
 
         document.getElementById('totalSales').innerText = rangeTotalSales.toLocaleString();
 
@@ -1799,9 +1816,15 @@
         renderSelectOptions();
     }
 
+    // 히스토리에 판매처 필터 적용
     function renderSalesHistory(start, end) {
         const historyList = document.getElementById('historyContainer');
-        const filteredHistory = db_history.filter(obj => obj.date >= start && obj.date <= end);
+        const sourceFilter = document.getElementById('sourceFilter')?.value || ""; 
+        
+        // 지정된 판매처만 필터링되도록 조건 적용
+        const filteredHistory = db_history.filter(obj => 
+            obj.date >= start && obj.date <= end && (sourceFilter === "" || obj.source === sourceFilter)
+        );
 
         const grouped = filteredHistory.reduce((acc, obj) => {
             acc[obj.date] = acc[obj.date] || {};
@@ -1969,6 +1992,21 @@
             select.innerHTML = optionsHtml;
             if (currentVal) select.value = currentVal; // 기존 선택값 복원
         });
+
+        // 4. 히스토리 화면의 판매처 필터 옵션 동적 업데이트 (수기 입력 판매처 포함)
+        const filterElem = document.getElementById('sourceFilter');
+        if (filterElem) {
+            const currentFilterVal = filterElem.value;
+            const defaultSources = ["세미트론", "쿠팡", "네이버", "컴퓨존", "SSG", "라운즈", "금양", "GS", "11번가", "M몰", "올웨이즈", "이마트", "기타"];
+            const customSources = new Set(db_history.map(h => h.source).filter(s => s && !defaultSources.includes(s)));
+            
+            let filterHtml = `<option value="">모든 판매처</option>`;
+            defaultSources.forEach(src => filterHtml += `<option value="${src}">${src}</option>`);
+            customSources.forEach(src => filterHtml += `<option value="${src}">${src}</option>`);
+            
+            filterElem.innerHTML = filterHtml;
+            if (currentFilterVal) filterElem.value = currentFilterVal;
+        }
 
         const multiSaleRows = document.getElementById('multiSaleRows');
         if (multiSaleRows && multiSaleRows.children.length === 0) {
@@ -2170,7 +2208,7 @@
             const qty = parseInt(row.querySelector('.multi-sale-qty')?.value || 0, 10);
             let source = row.querySelector('.multi-sale-source')?.value || '기타';
 
-            // [추가] 기타 선택 시 직접 입력한 값 가져오기
+            // 기타 선택 시 직접 입력한 값 가져오기
             if (source === '기타') {
                 const customSource = row.querySelector('.multi-sale-custom-source')?.value.trim();
                 if (customSource) {
